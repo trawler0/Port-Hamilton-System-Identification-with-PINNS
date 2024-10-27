@@ -1,6 +1,6 @@
 from train import TrainingModule
 from model import *
-from utils import TrainDataset, sample_initial_states, normalized_mae
+from utils import Dataset, sample_initial_states, normalized_mae, FasterLoader, train
 from data import simple_experiment
 from pytorch_lightning import Trainer
 import torch
@@ -9,16 +9,16 @@ from data import dim_bias_scale
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--name", type=str, default="spring")
+parser.add_argument("--name", type=str, default="inductor")
 parser.add_argument("--num_trajectories", type=int, default=1000)
 parser.add_argument("--num_val_trajectories", type=int, default=5000)
 parser.add_argument("--hidden_dim", type=int, default=64)
-parser.add_argument("--J", type=str, default="sigmoid")
-parser.add_argument("--R", type=str, default="sigmoid")
+parser.add_argument("--J", type=str, default="matmul")
+parser.add_argument("--R", type=str, default="matmul_rescale")
 parser.add_argument("--G", type=str, default="mlp")
 parser.add_argument("--excitation", type=str, default="linear")
 parser.add_argument("--grad_H", type=str, default="gradient")
-parser.add_argument("--time", type=float, default=50)
+parser.add_argument("--time", type=float, default=10)
 parser.add_argument("--steps", type=int, default=1000)
 parser.add_argument("--lr", type=float, default=5e-3)
 parser.add_argument("--epochs", type=int, default=20)
@@ -47,10 +47,10 @@ X_val, u_val, y_val, trajectories_val = generator_val.get_data(X0_val)
 X, u, y = torch.tensor(X, dtype=torch.float32), torch.tensor(u, dtype=torch.float32), torch.tensor(y, dtype=torch.float32)
 X_val, u_val, y_val = torch.tensor(X_val, dtype=torch.float32), torch.tensor(u_val, dtype=torch.float32), torch.tensor(y_val, dtype=torch.float32)
 
-train_ds = TrainDataset(X, u, y)
-val_ds = TrainDataset(torch.tensor(X_val, dtype=torch.float32), torch.tensor(u_val, dtype=torch.float32), torch.tensor(y_val, dtype=torch.float32))
+train_ds = Dataset(X, u, y)
+val_ds = Dataset(X_val, u_val, y_val)
 
-train_loader = torch.utils.data.DataLoader(train_ds, batch_size=args.batch_size, shuffle=True)
+train_loader = torch.utils.data.DataLoader(train_ds, batch_size=args.batch_size, shuffle=True) #FasterLoader(X, u, y, args.batch_size)
 val_loader = torch.utils.data.DataLoader(val_ds, batch_size=len(val_ds), shuffle=False)
 
 
@@ -60,16 +60,20 @@ trainer = Trainer(max_epochs=args.epochs, enable_checkpointing=False, logger=Fal
 trainer.fit(model, train_loader)
 torch.save(model.model.state_dict(), args.checkpoint)
 
+
+# train(model, X, u, y, args.epochs, args.lr, args.weight_decay, args.batch_size)
+
+
 X_val = torch.tensor(X_val, dtype=torch.float32)
 u_val = torch.tensor(u_val, dtype=torch.float32)
 y_val = torch.tensor(y_val, dtype=torch.float32)
-y_hat = model.model(X_val, u_val)
+y_hat = model(X_val, u_val)
 print("---------------------------------------------------------")
 print(torch.mean(torch.abs(y_hat - y_val)).item())
 print(normalized_mae(y_hat, y_val).item())
 print("---------------------------------------------------------")
-# 0.004, .0004
-# 0.007, 0.004
+# 0.006, 0.014
+# 0.0026, 0.0056
 
 
 

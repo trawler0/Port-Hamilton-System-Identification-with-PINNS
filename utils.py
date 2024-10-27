@@ -1,5 +1,8 @@
 import numpy as np
 import torch
+from copy import deepcopy
+from tqdm import tqdm
+import math
 
 
 def sample_initial_states(num_trajectories, dim, strategy):
@@ -39,7 +42,7 @@ def forecast(model, X0, u, dt, steps):
     return X
 
 
-class TrainDataset(torch.utils.data.Dataset):
+class Dataset(torch.utils.data.Dataset):
 
     def __init__(self, X, u, y):
         self.X = X
@@ -67,6 +70,27 @@ class ValDataset(torch.utils.data.Dataset):
         return self.trajectories[idx]
 
 
+class FasterLoader:
+
+    def __init__(self, X, u, y, batch_size):
+        self.X = X
+        self.u = u
+        self.y = y
+        self.batch_size = batch_size
+
+    def __iter__(self):
+        X, u, y = deepcopy(self.X), deepcopy(self.u), deepcopy(self.y)
+        idx = torch.randperm(len(X))
+        for i in range(len(X) // self.batch_size):
+            x_out = X[idx[i * self.batch_size: (i + 1) * self.batch_size]]
+            u_out = u[idx[i * self.batch_size: (i + 1) * self.batch_size]]
+            y_out = y[idx[i * self.batch_size: (i + 1) * self.batch_size]]
+            yield x_out, u_out, y_out
+
+    def __len__(self):
+        return len(self.X) // self.batch_size
+
+
 def normalized_mse(x, target):
     std = target.std()
     return ((x - target) / std).pow(2).mean()
@@ -76,7 +100,44 @@ def normalized_mae(x, target):
     return ((x - target) / std).abs().mean()
 
 
+
+def train(model, X, u, y, epochs, lr, weight_decay, batch_size, criterion=normalized_mse):
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
+    loader = FasterLoader(X, u, y, batch_size)
+    total_steps = len(X) // batch_size * epochs
+    def lr_lambda(step, warmup=.1):
+        if step / total_steps < warmup:
+            return step / (total_steps * warmup)
+        actual_step = step - total_steps * warmup
+        actual_total = total_steps * (1 - warmup)
+        return .5 * (1 + math.cos(math.pi * actual_step / actual_total))
+
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
+    for epoch in range(epochs):
+        pbar = tqdm(loader)
+        model.train()
+        running_loss = 0
+        for i, (x, u, y) in enumerate(pbar):
+            optimizer.zero_grad()
+            y_hat = model(x, u)
+            loss = criterion(y_hat, y)
+            running_loss += loss.item()
+            loss.backward()
+            optimizer.step()
+            scheduler.step()
+            pbar.set_postfix({"loss": running_loss / (i + 1), "epoch": epoch, "lr": optimizer.param_groups[0]["lr"]})
+
+    return model
+
+
+
 if __name__ == "__main__":
-    x = torch.rand(10, 4, 2)
-    target = torch.rand(10, 4, 2)
-    print(normalized_mse(x, target))
+    from model import PHNNModel
+    model = PHNNModel(4, 64, J="sigmoid", R="sigmoid", grad_H="gradient")
+    model.load_state_dict(torch.load('model_spring.pt'))
+
+
+
+
+
+

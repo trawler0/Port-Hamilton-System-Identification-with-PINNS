@@ -317,6 +317,29 @@ class RMatmul(nn.Module):
         R = R_ @ R_.permute(0, 2, 1)
         return R
 
+class RMatmulRescale(nn.Module):
+
+    def __init__(
+            self,
+            input_dim,
+            hidden_dim,
+    ):
+        super().__init__()
+        self.R_ = MLP(input_dim, hidden_dim, ((input_dim + 1) * input_dim) // 2, 1)
+        self.log_tij = torch.nn.Parameter(torch.randn(1, input_dim, input_dim))
+        self.bij = torch.nn.Parameter(torch.randn(1, input_dim, input_dim))
+        self.vtu = VTU(input_dim)
+
+    def forward(self, x, grad_H):
+        R_ = self.vtu(self.R_(x))
+        R = R_ @ R_.permute(0, 2, 1) * torch.exp(self.log_tij) + self.bij
+        return (grad_H.unsqueeze(1) @ R).squeeze(1)
+
+    def reparam(self, x):
+        R_ = self.vtu(self.R_(x))
+        R = R_ @ R_.permute(0, 2, 1) * torch.exp(self.log_tij) + self.bij
+        return R
+
 # do not know what this represents, it is not a quadratic Hamiltonian
 class Grad_HMatmul(nn.Module):
 
@@ -371,6 +394,8 @@ class PHNNModel(nn.Module):
             self.R = RLinear(input_dim)
         elif R == "matmul":
             self.R = RMatmul(input_dim, hidden_dim)
+        elif R == "matmul_rescale":
+            self.R = RMatmulRescale(input_dim, hidden_dim)
         else:
             raise ValueError("Unknown R")
 

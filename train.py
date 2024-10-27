@@ -29,16 +29,8 @@ class TrainingModule(LightningModule):
 
         X, u, y = batch
         y_hat = self.model(X, u)
-        if isinstance(y_hat, list):
-            loss = sum([self.loss_fn(y_hat[i], y) for i in range(len(y_hat))]) / len(y_hat)
-        else:
-            loss = self.loss_fn(y_hat, y)
+        loss = self.loss_fn(y_hat, y)
         self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
-        if hasattr(self.model, "penalty_activations"):
-            J_, R_ = self.model.penalty_activations(X)
-            penalty = self.epsilon * (torch.abs(J_).mean() + torch.abs(R_).mean())
-            self.log("penalty", penalty, on_step=True, on_epoch=True, prog_bar=True, logger=True)
-            loss += penalty
         return loss
 
     def validation_step(self, batch, batch_idx):
