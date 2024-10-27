@@ -3,7 +3,6 @@ from torch import nn
 import torch.nn.functional as F
 from functools import partial
 
-
 class VTU(nn.Module):
 
     def __init__(self, N, strict=False):
@@ -377,7 +376,7 @@ class Grad_H(nn.Module):
 
 class PHNNModel(nn.Module):
 
-    def __init__(self, input_dim, hidden_dim, J="sigmoid", R="sigmoid", grad_H="gradient", G="mlp", excitation="linear"):
+    def __init__(self, input_dim, hidden_dim, J="sigmoid", R="sigmoid", grad_H="gradient", G="mlp", excitation="linear", u_dim=1):
         super().__init__()
         if J == "sigmoid":
             self.J = J_Sigmoid(input_dim, hidden_dim, excitation)
@@ -410,9 +409,9 @@ class PHNNModel(nn.Module):
             raise ValueError("Unknown grad_H")
 
         if G == "mlp":
-            self.G = MLP(input_dim, hidden_dim, input_dim, 1)
+            self.G = MLP(input_dim, hidden_dim, input_dim * u_dim, 1)
         elif G == "linear":
-            self.G = GLinear(input_dim)
+            self.G = GLinear(input_dim * u_dim)
         else:
             raise ValueError("Unknown G")
 
@@ -421,8 +420,9 @@ class PHNNModel(nn.Module):
         J_hat = self.J(x, grad_H)
         R_hat = self.R(x, grad_H)
         G = self.G(x)
+        G = G.view(G.size(0), G.size(1) // u.size(-1), u.size(-1))
 
-        return J_hat - R_hat + G * u
+        return J_hat - R_hat + torch.einsum("bij,bj->bi", G, u)
 
     def reparam(self, x):
         J = self.J.reparam(x)
@@ -434,11 +434,7 @@ class PHNNModel(nn.Module):
 
 
 if __name__ == "__main__":
-    model = PHNNModel(3, 64, J="linear", R="linear", grad_H="gradient", G="linear", excitation="mlp")
-    from torchsummary import summary
-    summary(model, [(3,), (1,)], device="cpu")
+    model = PHNNModel(3, 64, J="linear", R="linear", grad_H="gradient", G="linear", excitation="mlp", u_dim=2)
     x = torch.randn(10, 3)
-    u = torch.randn(10, 1)
-    y = model(x, u)
-    J, R = model.reparam(x)
-    H = model.H(x)
+    u = torch.randn(10, 2)
+    model(x, u)
