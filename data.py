@@ -7,8 +7,6 @@ from tqdm import tqdm
 
 
 class BaseDataGenerator:
-    X: torch.Tensor
-    y: torch.Tensor
 
     def __init__(self, simulation_time, num_steps, generate_signal=None):
         self.simulation_time = simulation_time
@@ -30,16 +28,22 @@ class BaseDataGenerator:
     def G(self, x):
         raise NotImplementedError("Subclass must implement abstract method")
 
+    def y(self, x, u):
+        grad_H = self.grad_H(x)
+        G = self.G(x)
+        return grad_H.dot(G)
+
     def system_dynamics(self, x, t, u):
         if u is None:
             u = lambda s: 0
-        return (self.J(x) - self.R(x)) @ self.grad_H(x) + self.G(x) * u(t)
+        return (self.J(x) - self.R(x)) @ self.grad_H(x) + self.G(x).dot(u(t))
 
     def __call__(self, x, u):
-        y_hat = []
+        xdot_hat = []
         for i in range(len(x)):
-            y_hat.append((self.J(x[i]) - self.R(x[i])) @ self.grad_H(x[i]) + self.G(x[i]) * u[i])
-        return np.stack(y_hat)
+
+            xdot_hat.append((self.J(x[i]) - self.R(x[i])) @ self.grad_H(x[i]) + self.G(x[i]).dot(u[i]))
+        return np.stack(xdot_hat)
 
     def generate_trajectory(self, x0, u=None):
         t = np.linspace(0, self.simulation_time, self.num_steps)
@@ -47,12 +51,13 @@ class BaseDataGenerator:
         if u is None:
             u_out = np.zeros((self.num_steps, 1))
         else:
-            u_out = np.array([u(t) for t in t]).reshape(-1, 1)
+            u_out = np.stack([u(t) for t in t])
         return odeint(dynamics, x0, t), u_out
 
     def get_data(self, X0):
         all_X = []
         all_u = []
+        all_xdot = []
         all_y = []
         print("Generating trajectories")
         dt = self.simulation_time / self.num_steps
@@ -60,16 +65,20 @@ class BaseDataGenerator:
         for j, x0 in enumerate(tqdm(X0)):
             u = self.generate_signal(seed=j) if self.generate_signal is not None else None
             X, u = self.generate_trajectory(x0, u)
-            y = (X[1:] - X[:-1]) / dt
-            trajectories.append((X, u))
+            # xdot = (X[1:] - X[:-1]) / dt
+            xdot = self.__call__(X[:-1], u[:-1])
+            y = np.stack([self.y(X[k], u[k]) for k in range(len(u))])
+            trajectories.append((X, u, y))
             all_X.append(X[:-1])
             all_u.append(u[:-1])
+            all_xdot.append(xdot)
             all_y.append(y)
 
         X = np.concatenate(all_X)
         u = np.concatenate(all_u)
-        y = np.concatenate(all_y)
-        return X, u, y, trajectories
+        xdot = np.concatenate(all_xdot)
+        y = np.concatenate(y)
+        return X, u, xdot, y, trajectories
 
 
 class CoupledSpringMassDamper(BaseDataGenerator):
@@ -136,12 +145,6 @@ class ControlledInductor(BaseDataGenerator):
     def R(self, x):
         return 0
 
-    def u(self, t, b=0.):
-        period = 5.
-        amplitude = 1.
-        u = np.sin(2 * np.pi * t / period + b) * amplitude
-        return np.ones((1,)) * u
-
     def G(self, x):
         return self.G_
 
@@ -156,13 +159,15 @@ def simple_experiment(name, simulation_time, num_steps, **kwargs):
         m = kwargs.pop("m", 1)
         R = kwargs.pop("R", .1)
         c = kwargs.pop("c", 1)
-        G = kwargs.pop("G", np.array([0, 0, 1]))
+        G = kwargs.pop("G", np.array([[0], [0], [1]]))
         amplitude_min = kwargs.pop("amplitude_min", 0)
         amplitude_max = kwargs.pop("amplitude_max", 1)
         period_min = kwargs.pop("period_min", .5)
         period_max = kwargs.pop("period_max", 10)
+        bias_min = kwargs.pop("period_min", 2)
+        bias_max = kwargs.pop("period_max", 6.14)
         signal = kwargs.pop("signal", "sin")
-        get_u = partial(generate_signal, period_min, period_max, amplitude_min, amplitude_max, signal=signal)
+        get_u = partial(generate_signal, period_min, period_max, amplitude_min, amplitude_max, bias_min, bias_max, signal=signal)
 
         return ControlledInductor(m, R, c, G, simulation_time, num_steps, get_u)
     else:
@@ -186,22 +191,24 @@ if __name__ == "__main__":
 
     generator = simple_experiment("inductor", 10, 1000)
     X0 = sample_initial_states(100, 3, {"identifies": "uniform", "seed": 42})
-    X, u, y, trajectories = generator.get_data(X0)
+    X, u, xdot, y, trajectories = generator.get_data(X0)
 
-    y_hat = generator(X, u)
-    std = np.std(y, axis=0, keepdims=True)
+    xdot_hat = generator(X, u)
+    print(xdot.shape, xdot_hat.shape)
+    std = np.std(xdot, axis=0, keepdims=True)
     print(std)
-    print(np.mean(np.abs(y_hat - y) / std), np.mean(np.abs(y_hat - y)))
+    print(np.mean(np.abs(xdot_hat - xdot) / std), np.mean(np.abs(xdot_hat - xdot)))
 
-    X, u = trajectories[5]
-    y_hat = generator(X[:-1], u[:-1])
+    X, u, y = trajectories[5]
+    xdot_hat = generator(X[:-1], u[:-1])
     dt = 1 / 100
-    y = (X[1:] - X[:-1]) / dt
+    xdot = (X[1:] - X[:-1]) / dt
     X = X[:-1]
     u = u[:-1]
 
     plt.plot(X[:, 0], label="X")
-    plt.plot(y_hat[:, 0], label="y_hat")
+    plt.plot(xdot_hat[:, 0], label="xdot_hat")
+    plt.plot(xdot[:, 0], label="xdot")
     plt.plot(y[:, 0], label="y")
     plt.plot(u, label="u")
     plt.legend()
