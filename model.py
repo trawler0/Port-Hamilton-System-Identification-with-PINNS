@@ -422,7 +422,10 @@ class PHNNModel(nn.Module):
         G = self.G(x)
         G = G.view(G.size(0), G.size(1) // u.size(-1), u.size(-1))
 
-        return J_hat - R_hat + torch.einsum("bij,bj->bi", G, u)
+        y = torch.einsum("bij,bi->bj", G, grad_H)
+        xdot = J_hat - R_hat + torch.einsum("bij,bj->bi", G, u)
+
+        return xdot, y
 
     def reparam(self, x):
         J = self.J.reparam(x)
@@ -434,7 +437,7 @@ class PHNNModel(nn.Module):
 
 
 if __name__ == "__main__":
-    model = PHNNModel(3, 64, J="linear", R="linear", grad_H="gradient", G="linear", excitation="mlp", u_dim=2)
+    model = PHNNModel(3, 64, J="linear", R="linear", grad_H="gradient", G="linear", excitation="mlp", u_dim=1)
     x = torch.randn(10, 3)
-    u = torch.randn(10, 2)
-    model(x, u)
+    u = torch.randn(10, 1)
+    print(model(x, u))

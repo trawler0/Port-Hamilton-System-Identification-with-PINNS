@@ -27,22 +27,24 @@ class TrainingModule(LightningModule):
 
     def training_step(self, batch, batch_idx):
 
-        X, u, y = batch
-        y_hat = self.model(X, u)
-        loss = self.loss_fn(y_hat, y)
-        self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
-        return loss
+        X, u, xdot, y = batch
+        xdot_hat, y_hat = self.model(X, u)
+        loss_xdot = self.loss_fn(xdot_hat, xdot)
+        loss_y = self.loss_fn(y_hat, y)
+        self.log("loss_xdot", loss_xdot, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        self.log("loss_y", loss_y, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        return loss_xdot + loss_y
 
     def validation_step(self, batch, batch_idx):
 
-        X, u, y = batch
+        X, u, xdot, y = batch
 
-        y_hat = self.model(X, u)
+        xdot_hat, y_hat = self.model(X, u)
 
-        mse = torch.nn.functional.mse_loss(y_hat, y)
-        mae = torch.nn.functional.l1_loss(y_hat, y)
-        mse_rel = normalized_mse(y_hat, y)
-        mae_rel = normalized_mae(y_hat, y)
+        mse = torch.nn.functional.mse_loss(xdot_hat, xdot)
+        mae = torch.nn.functional.l1_loss(xdot_hat, xdot)
+        mse_rel = normalized_mse(xdot_hat, xdot)
+        mae_rel = normalized_mae(xdot_hat, xdot)
 
         self.log(f"val_mse", mse, prog_bar=True, logger=True)
         self.log(f"val_mae", mae, prog_bar=True, logger=True)

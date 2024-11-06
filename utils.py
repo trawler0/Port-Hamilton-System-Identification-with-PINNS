@@ -23,27 +23,18 @@ def sample_initial_states(num_trajectories, dim, strategy):
         X0 = X0 + strategy["bias"]
     return X0
 
-def generate_signal(period_min, period_max, amplitude_min, amplitude_max, bias_min, bias_max, seed, signal, n_signals=1):
+def generate_signal(period_min, period_max, amplitude_min, amplitude_max, seed, signal):
     np.random.seed(seed)
     period = np.random.uniform(period_min, period_max)
     amplitude = np.random.uniform(amplitude_min, amplitude_max)
-    bias = np.random.uniform(bias_min, bias_max)
     def u(t):
         if signal == "sin":
-            return np.reshape(np.sin(2 * np.pi * t / period + bias + bias) * amplitude, (1, ))
+            return np.sin(2 * np.pi * t / period) * amplitude
         elif signal == "binary":
-            return np.reshape(amplitude if t % period < period / 2 else 0, (1, ))
+            return amplitude if t % period < period / 2 else 0
         else:
             raise NotImplementedError("Signal not implemented")
-
-    if n_signals > 1:
-        def u_cat(t):
-            u_ = [generate_signal(period_min, period_max, amplitude_min, amplitude_max, bias_min, bias_max, seed + j, signal) for j in range(n_signals)]
-            return np.concatenate([u(t) for u in u_])
-        return u_cat
-    else:
-        return u
-
+    return u
 
 def forecast(model, X0, u, dt, steps):
     X = torch.zeros(steps, X0.shape[0])
@@ -225,6 +216,12 @@ def scatter(cp, c, name, samples=1000):
         plt.close(fig)
 
 
+
+
+if __name__ == "__main__":
+    from model import PHNNModel
+    model = PHNNModel(4, 64, J="sigmoid", R="sigmoid", grad_H="gradient")
+    model.load_state_dict(torch.load('model_spring.pt'))
 
 
 
