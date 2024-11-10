@@ -8,7 +8,7 @@ from utils import normalized_mse, normalized_mae
 class TrainingModule(LightningModule):
 
 
-    def __init__(self, model, loss_fn="normalized_mse", lr=1e-3, weight_decay=0.):
+    def __init__(self, model, loss_fn="mse", lr=1e-3, weight_decay=0., output_weight=.1):
 
         super(TrainingModule, self).__init__()
         self.model = model
@@ -21,6 +21,7 @@ class TrainingModule(LightningModule):
 
         self.lr = lr
         self.weight_decay = weight_decay
+        self.output_weight = output_weight
 
     def forward(self, x, u):
         return self.model(x, u)
@@ -33,7 +34,7 @@ class TrainingModule(LightningModule):
         loss_y = self.loss_fn(y_hat, y)
         self.log("loss_xdot", loss_xdot, on_step=True, on_epoch=True, prog_bar=True, logger=True)
         self.log("loss_y", loss_y, on_step=True, on_epoch=True, prog_bar=True, logger=True)
-        return loss_xdot + loss_y
+        return loss_xdot + self.output_weight * loss_y
 
     def validation_step(self, batch, batch_idx):
 

@@ -52,6 +52,7 @@ class MLP(nn.Sequential):
             hidden_dim,
             output_dim,
             depth,
+            batchnorm_input=False,
             activation=partial(nn.SiLU, inplace=True),
     ):
         layers = [nn.Sequential(
@@ -66,6 +67,8 @@ class MLP(nn.Sequential):
                 activation(),
             ))
         layers.append(nn.Linear(hidden_dim, output_dim))
+        if batchnorm_input:
+            layers = [nn.BatchNorm1d(input_dim)] + layers
         super(MLP, self).__init__(*layers)
 
 
@@ -422,8 +425,10 @@ class PHNNModel(nn.Module):
         G = self.G(x)
         G = G.view(G.size(0), G.size(1) // u.size(-1), u.size(-1))
 
-        y = torch.einsum("bij,bi->bj", G, grad_H)
-        xdot = J_hat - R_hat + torch.einsum("bij,bj->bi", G, u)
+        y = (G.transpose(1, 2) @ grad_H.unsqueeze(-1)).squeeze(-1)
+        input_term = (G @ u.unsqueeze(-1)).squeeze(-1)
+
+        xdot = J_hat - R_hat + input_term
 
         return xdot, y
 
