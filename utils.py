@@ -11,16 +11,16 @@ from matplotlib import pyplot as plt
 def sample_initial_states(num_trajectories, dim, strategy):
     if strategy["identifies"] == "uniform":
         np.random.seed(strategy["seed"])
-        X0 = np.random.uniform(-1, 1, (num_trajectories, dim))
+        X0 = np.random.uniform(0, 1, (num_trajectories, dim))
     elif strategy["identifies"] == "normal":
         np.random.seed(strategy["seed"])
         X0 = np.random.normal(0, 1, (num_trajectories, dim))
     else:
         raise NotImplementedError("Sampling strategy not implemented")
     if "scale" in strategy:
-        X0 = X0 * strategy["scale"]
+        X0 = X0 * np.reshape(strategy["scale"], (1, dim))
     if "bias" in strategy:
-        X0 = X0 + strategy["bias"]
+        X0 = X0 + np.reshape(strategy["bias"], (1, dim))
     return X0
 
 def generate_signal(period_min, period_max, amplitude_min, amplitude_max, bias_min, bias_max, seed, signal, n_signals=1):
@@ -47,13 +47,17 @@ def generate_signal(period_min, period_max, amplitude_min, amplitude_max, bias_m
     else:
         return u
 
+@torch.no_grad()
 def forecast(model, X0, u, dt, steps, clamp=10.):
+    model.eval()
     X = torch.zeros(steps, X0.shape[0])
     u = torch.tensor(u)
     X[0] = torch.tensor(X0)
-    for i in range(1, steps):
+    for i in tqdm(range(1, steps)):
         X = X.clone().detach()
-        X[i] = model(X[i-1:i].float(), u[i-1:i].float())[0] * dt + X[i-1:i]
+        with torch.autograd.enable_grad():
+            dxdt = model(X[i-1:i].float(), u[i-1:i].float())[0]
+        X[i] = dxdt * dt + X[i-1:i]
         X[i] = torch.clamp(X[i], -clamp, clamp)
     return X
 

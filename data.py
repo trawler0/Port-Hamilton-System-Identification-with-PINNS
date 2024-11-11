@@ -221,12 +221,12 @@ def simple_experiment(name, simulation_time, num_steps, **kwargs):
         get_u = partial(generate_signal, period_min, period_max, amplitude_min, amplitude_max, bias_min, bias_max, signal=signal, n_signals=2)
         return CoupledSpringMassDamper(G, masses, spring_constants, damping, simulation_time, num_steps, get_u)
     elif name == "ball":
-        m = kwargs.pop("m", 1.)  # Hannes: 0.012, Achraf: 1.
+        m = kwargs.pop("m", .01)  # Hannes: 0.1, Achraf: 1.
         R = kwargs.pop("R", .1)  # Hannes: 0.1, Achraf: 0.1
-        c = kwargs.pop("c", 1.)  # Hannes: 0.1, Achraf: 1.
+        c = kwargs.pop("c", 1.)  # Hannes: 1., Achraf: 1.
         G = kwargs.pop("G", np.array([[0], [0], [1]]))
         amplitude_min = kwargs.pop("amplitude_min", 0)
-        amplitude_max = kwargs.pop("amplitude_max", 5.)
+        amplitude_max = kwargs.pop("amplitude_max", 3.)
         period_min = kwargs.pop("period_min", .5)
         period_max = kwargs.pop("period_max", 10)
         bias_min = kwargs.pop("period_min", 0)
@@ -261,8 +261,8 @@ def dim_bias_scale_sigs(name):
         sigs = 2
     elif name == "ball":
         DIM = 3
-        scale = np.array([[1.5, .4, 1.]])
-        bias = np.array([[-.75, -.2, .3]])
+        scale = np.array([[2., .4, 8.]])
+        bias = np.array([[-.5, -.2, -3]])
         sigs = 1
     elif name == "motor":
         DIM = 3
@@ -276,8 +276,10 @@ def dim_bias_scale_sigs(name):
 if __name__ == "__main__":
     from matplotlib import pyplot as plt
 
-    generator = simple_experiment("ball", 100, 10000)
-    X0 = sample_initial_states(20, 3, {"identifies": "uniform", "seed": 41})
+    generator = simple_experiment("ball", 10, 1000)
+    DIM, scale, bias, sigs = dim_bias_scale_sigs("ball")
+    X0 = sample_initial_states(20, 3, {"identifies": "uniform", "seed": 41, "scale": scale, "bias": bias})
+    print(X0)
     X, u, xdot, y, trajectories = generator.get_data(X0)
     print(y.shape)
 
