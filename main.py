@@ -36,7 +36,6 @@ parser.add_argument("--repeat", type=int, default=10)
 parser.add_argument("--run_name", type=str, default=None)
 
 
-
 args = parser.parse_args()
 
 with mlflow.start_run(run_name=args.run_name) as run:

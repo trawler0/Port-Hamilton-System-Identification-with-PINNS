@@ -80,6 +80,7 @@ class BaseDataGenerator:
         return X, u, xdot, y, trajectories
 
 
+
 class CoupledSpringMassDamper(BaseDataGenerator):
 
     def __init__(self, G_, masses, spring_constants, damping, simulation_time, num_steps, generate_signal=None):
