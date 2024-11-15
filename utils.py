@@ -34,6 +34,7 @@ def multi_sin_signal(n_signals=1, amplitude=.2, seed=None):
         return out
     return u
 
+
 @torch.no_grad()
 def forecast(model, X0, u, dt, steps, clamp=10.):
     model.eval()
