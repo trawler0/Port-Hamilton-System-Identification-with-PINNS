@@ -23,29 +23,16 @@ def sample_initial_states(num_trajectories, dim, strategy):
         X0 = X0 + np.reshape(strategy["bias"], (1, dim))
     return X0
 
-def generate_signal(period_min, period_max, amplitude_min, amplitude_max, bias_min, bias_max, seed, signal, n_signals=1):
-    np.random.seed(seed)
-    period = np.random.uniform(period_min, period_max)
-    amplitude = np.random.uniform(amplitude_min, amplitude_max)
-    bias = np.random.uniform(bias_min, bias_max)
+def multi_sin_signal(n_signals=1, amplitude=.2, seed=None):
+    if seed is not None:
+        np.random.seed(seed)
+    i = np.arange(40)
+    i, phi = np.stack([i] * n_signals), np.stack([np.random.uniform(0, 2 * np.pi, 40)] * n_signals)
     def u(t):
-        if signal == "sin":
-            return np.reshape(np.sin(2 * np.pi * t / period + bias + bias) * amplitude, (1, ))
-        elif signal == "sin_pos":
-            return np.reshape((np.sin(2 * np.pi * t / period + bias + bias) + 1)*amplitude/2, (1, ))
-
-        elif signal == "binary":
-            return np.reshape(amplitude if t % period < period / 2 else 0, (1, ))
-        else:
-            raise NotImplementedError("Signal not implemented")
-
-    if n_signals > 1:
-        def u_cat(t):
-            u_ = [generate_signal(period_min, period_max, amplitude_min, amplitude_max, bias_min, bias_max, seed + j, signal) for j in range(n_signals)]
-            return np.concatenate([u(t) for u in u_])
-        return u_cat
-    else:
-        return u
+        sins = np.sin(2 * np.pi * i * .1 * t + phi)
+        out = np.sum(sins, axis=-1) * amplitude
+        return out
+    return u
 
 @torch.no_grad()
 def forecast(model, X0, u, dt, steps, clamp=10.):
@@ -246,8 +233,11 @@ def scatter(cp, c, name, samples=1000):
 
 
 
-
-
-
-
-
+if __name__ == "__main__":
+    from matplotlib import pyplot as plt
+    u = multi_sin_signal(n_signals=2, amplitude=.2)
+    t = np.linspace(0, 10, 1000)
+    print(u(0))
+    plt.plot(t, [u(tt)[0] for tt in t])
+    plt.plot(t, [u(tt)[1] for tt in t])
+    plt.show()
