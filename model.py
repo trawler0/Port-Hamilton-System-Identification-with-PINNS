@@ -75,22 +75,16 @@ class MLP(nn.Sequential):
 
 class Baseline(nn.Module):
 
-    def __init__(self, input_dim, hidden_dim, u_dim, linear=False):
+    def __init__(self, input_dim, hidden_dim, u_dim):
         super(Baseline, self).__init__()
-        self.L1 = nn.Linear(input_dim + u_dim, input_dim if linear else hidden_dim, bias=True)
-        self.swish = nn.SiLU(inplace=True)
-        self.L2 = nn.Linear(hidden_dim, input_dim, bias=True)
-
-        self.linear = linear
-
+        self.mlp = MLP(input_dim+u_dim, hidden_dim, input_dim+u_dim, depth=3)
 
     def forward(self, x, u):
-        x = torch.cat([x, u], dim=-1)
-        x = self.L1(x)
-        if not self.linear:
-            x = self.swish(x)
-            x = self.L2(x)
-        return x
+        u_dim = u.shape[-1]
+        xu = torch.cat([x, u], dim=-1)
+        out = self.mlp(xu)
+        return out[:, :-u_dim], out[:, -u_dim:]
+
 
 
 class ModelOld(nn.Module):

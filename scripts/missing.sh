@@ -1,0 +1,1 @@
+python main.py --name ball --num_trajectories 100 --num_val_trajectories 1000 --lr 5e-3 --epochs 100 --repeat 1 --J sigmoid  --R sigmoid  --G mlp --output-weight .25 --run_name ball_sigmoid_sigmoid_long --time 100
