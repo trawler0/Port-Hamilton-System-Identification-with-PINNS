@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.integrate import odeint
 import torch
-from utils import sample_initial_states, multi_sin_signal
+from utils import sample_initial_states, multi_sin_signal, get_uniform_white_noise, get_noise_bound
 from functools import partial
 from tqdm import tqdm
 
@@ -259,7 +259,10 @@ if __name__ == "__main__":
     generator = simple_experiment("spring", 10, 1000)
     X0 = sample_initial_states(20, 4, {"identifies": "uniform", "seed": 41})
     X, u, xdot, y, trajectories = generator.get_data(X0)
-    print(y.shape)
+    a = get_noise_bound(X, 20)
+
+    power_X = np.mean(X ** 2)
+    power_u = np.mean(u ** 2)
 
     xdot_hat = generator(X, u)
     print(xdot.shape, xdot_hat.shape)
@@ -267,14 +270,15 @@ if __name__ == "__main__":
     print(std)
     print(np.mean(np.abs(xdot_hat - xdot) / std), np.mean(np.abs(xdot_hat - xdot)))
 
-    for j in range(10):
+    for j in range(1):
         X, u, y = trajectories[j]
         dt = 1 / 100
         xdot = (X[1:] - X[:-1]) / dt
+        X += get_uniform_white_noise(X, a)
         X = X[:-1]
         u = u[:-1]
 
-        for k in range(X.shape[-1]):
+        for k in range(1):
             plt.plot(X[:, k], label=f"X_{k}")
             plt.plot(xdot[:, k], label=f"xdot_{k}")
         plt.plot(y[:, 0], label="y")

@@ -38,22 +38,21 @@ def multi_sin_signal(n_signals=1, amplitude=.2, seed=None):
 @torch.no_grad()
 def forecast(model, X0, u, dt, steps, clamp=10.):
     model.eval()
-    X = torch.zeros(steps, X0.shape[0])
+    X = torch.zeros(X0.shape[0], steps, X0.shape[-1])
     u = torch.tensor(u)
-    X[0] = torch.tensor(X0)
-    for i in tqdm(range(1, steps)):
+    X[:, 0] = torch.tensor(X0)
+    for i in tqdm(range(0, steps-1)):
         X = X.clone().detach()
         with torch.autograd.enable_grad():
-            dxdt = model(X[i-1:i].float(), u[i-1:i].float())[0]
-        X[i] = dxdt * dt + X[i-1:i]
-        X[i] = torch.clamp(X[i], -clamp, clamp)
+            dxdt = model(X[:, i].float(), u[:, i].float())[0]
+        X[:, i+1] = dxdt * dt + X[:, i]
+        X[:, i+1] = torch.clamp(X[:, i+1], -clamp, clamp)
     return X
 
 
 class Dataset(torch.utils.data.Dataset):
 
     def __init__(self, X, u, xdot, y):
-        print(X.shape, u.shape, xdot.shape, y.shape)
         self.X = X
         self.u = u
         self.xdot = xdot
@@ -145,18 +144,18 @@ def train(model, X, u, y, epochs, lr, weight_decay, batch_size, criterion=normal
     return model
 
 
-def compute_metrics(model, X_val, u_val, xdot_val, y_val):
+def compute_metrics(model, trajectories, dt, X, u, xdot, y):
 
-    xdot_pred, y_pred = model(X_val, u_val)
-    mae = torch.abs(xdot_pred - xdot_val).mean().item()
-    mse = ((xdot_pred - xdot_val)**2).mean().item()
-    mae_rel = normalized_mae(xdot_pred, xdot_val).item()
-    mse_rel = normalized_mse(xdot_pred, xdot_val).item()
+    xdot_pred, y_pred = model(X, u)
+    mae = torch.abs(xdot_pred - xdot).mean().item()
+    mse = ((xdot_pred - xdot)**2).mean().item()
+    mae_rel = normalized_mae(xdot_pred, xdot).item()
+    mse_rel = normalized_mse(xdot_pred, xdot).item()
 
-    output_mae = torch.abs(y_pred - y_val).mean().item()
-    output_mse = ((y_pred - y_val)**2).mean().item()
-    output_mae_rel = normalized_mae(y_pred, y_val).item()
-    output_mse_rel = normalized_mse(y_pred, y_val).item()
+    output_mae = torch.abs(y_pred - y).mean().item()
+    output_mse = ((y_pred - y)**2).mean().item()
+    output_mae_rel = normalized_mae(y_pred, y).item()
+    output_mse_rel = normalized_mse(y_pred, y).item()
 
     out_dict = {
         "mae": mae,
@@ -168,6 +167,19 @@ def compute_metrics(model, X_val, u_val, xdot_val, y_val):
         "output_mae_rel": output_mae_rel,
         "output_mse_rel": output_mse_rel
     }
+    X, u, y = np.stack([t[0] for t in trajectories]), np.stack([t[1] for t in trajectories]), np.stack(
+        [t[2] for t in trajectories])
+    X0 = X[:, 0]
+    X_pred = forecast(model, X0, u, dt, X.shape[1]).detach().numpy()
+    forecast_mae_rel = normalized_mae(torch.tensor(X_pred), torch.tensor(X)).item()
+    forecast_mse_rel = normalized_mse(torch.tensor(X_pred), torch.tensor(X)).item()
+    forecast_mae = torch.abs(torch.tensor(X_pred) - torch.tensor(X)).mean().item()
+    forecast_mse = ((torch.tensor(X_pred) - torch.tensor(X))**2).mean().item()
+    out_dict["forecast_mae"] = forecast_mae
+    out_dict["forecast_mse"] = forecast_mse
+    out_dict["forecast_mae_rel"] = forecast_mae_rel
+    out_dict["forecast_mse_rel"] = forecast_mse_rel
+
     if mlflow.active_run() is not None:
         mlflow.log_metrics(out_dict)
 
@@ -178,18 +190,18 @@ def visualize_trajectory(model, forecast_examples, steps, dt, trajectories):
 
     t = np.array([dt * s for s in range(steps)])
 
+    X, u, y = np.stack([t[0] for t in trajectories]), np.stack([t[1] for t in trajectories]), np.stack([t[2] for t in trajectories])
+    X0 = X[:, 0]
+    X_pred = forecast(model, X0, u, dt, steps).detach().numpy()
     for j in range(forecast_examples):
-        X, u, y = trajectories[j]
-        X0 = X[0]
-        X_pred = forecast(model, X0, u, dt, steps).detach().numpy()
         torch.cuda.empty_cache()
 
-        fig, axs = plt.subplots(X.shape[1], 1, figsize=(30, 10))
+        fig, axs = plt.subplots(X.shape[-1], 1, figsize=(30, 10))
         fig.suptitle(f'Trajectory example', fontsize=16)
 
-        for i in range(X.shape[1]):
-            axs[i].plot(t, X[:, i], linestyle="dashed", color="red", label=f"X_{i}", linewidth=4)
-            axs[i].plot(t, X_pred[:, i], linestyle="dotted", color="blue", label=f"X_pred_{i}", linewidth=4)
+        for i in range(X.shape[-1]):
+            axs[i].plot(t, X[j, :, i], linestyle="dashed", color="red", label=f"X_{i}", linewidth=4)
+            axs[i].plot(t, X_pred[j, :, i], linestyle="dotted", color="blue", label=f"X_pred_{i}", linewidth=4)
         buf = BytesIO()
         fig.savefig(buf, format='png')
         buf.seek(0)  # Rewind the buffer to the beginning
@@ -231,6 +243,20 @@ def scatter(cp, c, name, samples=1000):
 
         # Close the figure to free up memory
         plt.close(fig)
+
+def get_noise_bound(X, sig_noise_ratio):
+    power_signal = np.mean(X ** 2, axis=0)  # N x S
+    # SNR (db): 10 * log10(P_signal / P_noise)
+    P_noise = 10 ** (-sig_noise_ratio / 10) * power_signal
+    # P_noise**2 = (2 a)**2 / 12
+    a = np.sqrt(3 * P_noise)  # S
+    #noise = np.random.uniform(-a, a, X.shape)
+    #X += noise
+    return a
+
+def get_uniform_white_noise(X, a):
+    noise = np.random.uniform(-a, a, X.shape)
+    return noise
 
 
 

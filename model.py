@@ -3,6 +3,7 @@ from torch import nn
 import torch.nn.functional as F
 from functools import partial
 
+
 class VTU(nn.Module):
 
     def __init__(self, N, strict=False):
@@ -26,6 +27,7 @@ class VTU(nn.Module):
         M = torch.scatter(zeros, 1, idx, x)
         M = M.view(B, self.N, self.N)
         return M
+
 
 def functional_calculus(A: torch.Tensor, func) -> torch.Tensor:
     if A.shape[-1] != A.shape[-2]:
@@ -72,19 +74,17 @@ class MLP(nn.Sequential):
         super(MLP, self).__init__(*layers)
 
 
-
 class Baseline(nn.Module):
 
     def __init__(self, input_dim, hidden_dim, u_dim):
         super(Baseline, self).__init__()
-        self.mlp = MLP(input_dim+u_dim, hidden_dim, input_dim+u_dim, depth=3)
+        self.mlp = MLP(input_dim + u_dim, hidden_dim, input_dim + u_dim, depth=3)
 
     def forward(self, x, u):
         u_dim = u.shape[-1]
         xu = torch.cat([x, u], dim=-1)
         out = self.mlp(xu)
         return out[:, :-u_dim], out[:, -u_dim:]
-
 
 
 class ModelOld(nn.Module):
@@ -115,7 +115,6 @@ class ModelOld(nn.Module):
         nn.init.kaiming_normal_(self.J2)
         nn.init.kaiming_normal_(self.R1)
 
-
     def _R(self, x, grad_H):
         sigma = torch.sigmoid(self.R_sigma(x))
         sigma = torch.cat([sigma, torch.ones(sigma.size(0), self.input_dim, device=sigma.device)], dim=-1)
@@ -145,6 +144,7 @@ class ModelOld(nn.Module):
         G = self.G(x)
 
         return J_R + G * u
+
 
 class J_Sigmoid(nn.Module):
 
@@ -182,6 +182,7 @@ class J_Sigmoid(nn.Module):
         J_right = J2.permute(0, 2, 1) @ sigma @ J1.permute(0, 2, 1)  # B x input x input
         return J_left - J_right
 
+
 class R_Sigmoid(nn.Module):
 
     def __init__(self, input_dim, hidden_dim, excitation="linear"):
@@ -213,6 +214,7 @@ class R_Sigmoid(nn.Module):
         R = R_ @ sigma @ R_.permute(0, 2, 1)
         return R
 
+
 class JLinear(nn.Module):
 
     def __init__(self, dim):
@@ -229,6 +231,7 @@ class JLinear(nn.Module):
         J = self.J_ - self.J_.T
         return J.unsqueeze(0).expand(x.size(0), -1, -1)
 
+
 class RLinear(nn.Module):
 
     def __init__(self, dim):
@@ -244,6 +247,7 @@ class RLinear(nn.Module):
         R = self.R_ @ self.R_.T
         return R.unsqueeze(0).expand(x.size(0), -1, -1)
 
+
 # G linear in the sense of corresponding to linear PH-system, but it means it is constant
 class GLinear(nn.Module):
 
@@ -253,6 +257,7 @@ class GLinear(nn.Module):
 
     def forward(self, x):
         return self.G_.expand(x.size(0), -1)
+
 
 # quadratic Hamiltonian
 class Grad_HLinear(nn.Module):
@@ -271,9 +276,9 @@ class Grad_HLinear(nn.Module):
         Q = self.Q_ @ self.Q_.T
         return (F.linear(x, Q) @ x.unsqueeze(-1)).squeeze(-1)
 
+
 class JMatmul(nn.Module):
-    
-    
+
     def __init__(
             self,
             input_dim,
@@ -292,6 +297,7 @@ class JMatmul(nn.Module):
         J_ = self.vsu(self.J_(x))
         J = J_ - J_.permute(0, 2, 1)
         return J
+
 
 class RMatmul(nn.Module):
 
@@ -312,6 +318,7 @@ class RMatmul(nn.Module):
         R_ = self.vtu(self.R_(x))
         R = R_ @ R_.permute(0, 2, 1)
         return R
+
 
 class RMatmulRescale(nn.Module):
 
@@ -336,6 +343,7 @@ class RMatmulRescale(nn.Module):
         R = R_ @ R_.permute(0, 2, 1) * torch.exp(self.log_tij) + self.bij
         return R
 
+
 # do not know what this represents, it is not a quadratic Hamiltonian
 class Grad_HMatmul(nn.Module):
 
@@ -351,6 +359,7 @@ class Grad_HMatmul(nn.Module):
 
     def H(self, x):
         return None
+
 
 class Grad_H(nn.Module):
 
@@ -371,9 +380,11 @@ class Grad_H(nn.Module):
             )[0]
         return grad_H
 
+
 class PHNNModel(nn.Module):
 
-    def __init__(self, input_dim, hidden_dim, J="sigmoid", R="sigmoid", grad_H="gradient", G="mlp", excitation="linear", u_dim=1):
+    def __init__(self, input_dim, hidden_dim, J="sigmoid", R="sigmoid", grad_H="gradient", G="mlp", excitation="linear",
+                 u_dim=1):
         super().__init__()
         if J == "sigmoid":
             self.J = J_Sigmoid(input_dim, hidden_dim, excitation)

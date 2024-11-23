@@ -1,6 +1,6 @@
 from train import TrainingModule
 from model import *
-from utils import Dataset, sample_initial_states, compute_metrics, visualize_trajectory, scatter
+from utils import Dataset, sample_initial_states, compute_metrics, visualize_trajectory, scatter, get_uniform_white_noise, get_noise_bound
 from data import simple_experiment
 from pytorch_lightning import Trainer
 import torch
@@ -11,31 +11,32 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--name", type=str, default="spring")
-parser.add_argument("--num_trajectories", type=int, default=10)
-parser.add_argument("--num_val_trajectories", type=int, default=10)
+parser.add_argument("--num_trajectories", type=int, default=100)
+parser.add_argument("--num_val_trajectories", type=int, default=1000)
 parser.add_argument("--hidden_dim", type=int, default=64)
 parser.add_argument("--J", type=str, default="sigmoid")
 parser.add_argument("--R", type=str, default="sigmoid")
 parser.add_argument("--G", type=str, default="mlp")
-parser.add_argument("--output-weight", type=float, default=.25)
+parser.add_argument("--output-weight", type=float, default=.0)
 parser.add_argument("--excitation", type=str, default="mlp")
 parser.add_argument("--grad_H", type=str, default="gradient")
 parser.add_argument("--time", type=float, default=10)
 parser.add_argument("--steps", type=int, default=None)
-parser.add_argument("--lr", type=float, default=5e-3)
-parser.add_argument("--epochs", type=int, default=50)
-parser.add_argument("--criterion", type=str, default="normalized_mse")
+parser.add_argument("--lr", type=float, default=1e-3)
+parser.add_argument("--epochs", type=int, default=100)
+parser.add_argument("--criterion", type=str, default="mse")
 parser.add_argument("--batch_size", type=int, default=256)
 parser.add_argument("--seed", type=int, default=1)
 parser.add_argument("--weight_decay", type=float, default=1e-1)
 parser.add_argument("--checkpoint", type=str, default="model_spring.pt")
-parser.add_argument("--forecast_examples", type=int, default=10)
+parser.add_argument("--forecast_examples", type=int, default=20)
 parser.add_argument("--forecast_time", type=float, default=100.)
 parser.add_argument("--forecast_steps", type=int, default=10000)
 parser.add_argument("--repeat", type=int, default=10)
 parser.add_argument("--run_name", type=str, default=None)
 parser.add_argument("--example", type=str, default=None)
 parser.add_argument("--tag", type=str, default=None)
+parser.add_argument("--dB", type=float, default=None)
 parser.add_argument("--baseline", action="store_true", default=False)
 
 
@@ -66,8 +67,13 @@ with mlflow.start_run(run_name=args.run_name) as run:
                                    {"identifies": "uniform", "seed": args.seed, "scale": scale, "bias": bias})
 
     X, u, xdot, y, _ = generator.get_data(X0_train)
-    X, u, xdot, y = np.concatenate([X] * args.repeat), np.concatenate([u] * args.repeat), np.concatenate([xdot] * args.repeat), np.concatenate([y] * args.repeat)
     X_val, u_val, xdot_val, y_val, trajectories_val = generator_val.get_data(X0_val)
+    if args.dB is not None:
+        a = get_noise_bound(X, args.dB)
+        X = X + get_uniform_white_noise(X, a)
+        X_val = X_val + get_uniform_white_noise(X_val, a)
+
+    X, u, xdot, y = np.concatenate([X] * args.repeat), np.concatenate([u] * args.repeat), np.concatenate([xdot] * args.repeat), np.concatenate([y] * args.repeat)
     X, u, xdot, y = torch.tensor(X, dtype=torch.float32), torch.tensor(u, dtype=torch.float32), torch.tensor(xdot, dtype=torch.float32), torch.tensor(y, dtype=torch.float32)
     X_val, u_val, xdot_val, y_val = torch.tensor(X_val, dtype=torch.float32), torch.tensor(u_val, dtype=torch.float32), torch.tensor(xdot_val, dtype=torch.float32), torch.tensor(y_val, dtype=torch.float32)
 
@@ -86,8 +92,10 @@ with mlflow.start_run(run_name=args.run_name) as run:
     model = TrainingModule(model, loss_fn=args.criterion, lr=args.lr, weight_decay=args.weight_decay, output_weight=args.output_weight)
     trainer = Trainer(max_epochs=args.epochs//args.repeat, enable_checkpointing=False, logger=False, accelerator="cpu", gradient_clip_val=1)
     trainer.fit(model, train_loader)
+    #torch.save(model.model.state_dict(), args.checkpoint)
+    #model.model.load_state_dict(torch.load(args.checkpoint))
 
-    metrics = compute_metrics(model, X_val, u_val, xdot_val, y_val)
+    metrics = compute_metrics(model, trajectories_val, dt, X_val, u_val, xdot_val, y_val)
     print(metrics)
 
     steps = args.forecast_steps
@@ -98,6 +106,9 @@ with mlflow.start_run(run_name=args.run_name) as run:
 
     generator_val = simple_experiment(name, time, steps)
     _, _, _, _, trajectories_val = generator_val.get_data(X0_val[:forecast_examples])
+    if args.dB is not None:
+        trajectories_val = [(x + get_uniform_white_noise(x, a), u, y) for x, u, y in trajectories_val]
+
     visualize_trajectory(model, forecast_examples, steps, dt, trajectories_val)
 
     if not args.baseline:
@@ -130,5 +141,3 @@ with mlflow.start_run(run_name=args.run_name) as run:
         scatter(G, G_true, "G")
         scatter(R, R_true, "R")
         scatter(J, J_true, "S")
-
-
