@@ -9,11 +9,10 @@ from matplotlib import pyplot as plt
 
 
 def sample_initial_states(num_trajectories, dim, strategy):
+    np.random.seed(strategy["seed"])
     if strategy["identifies"] == "uniform":
-        np.random.seed(strategy["seed"])
         X0 = np.random.uniform(0, 1, (num_trajectories, dim))
     elif strategy["identifies"] == "normal":
-        np.random.seed(strategy["seed"])
         X0 = np.random.normal(0, 1, (num_trajectories, dim))
     else:
         raise NotImplementedError("Sampling strategy not implemented")
@@ -27,7 +26,7 @@ def multi_sin_signal(n_signals=1, amplitude=.2, seed=None):
     if seed is not None:
         np.random.seed(seed)
     i = np.arange(40)
-    i, phi = np.stack([i] * n_signals), np.stack([np.random.uniform(0, 2 * np.pi, 40)] * n_signals)
+    i, phi = np.stack([i] * n_signals), np.random.uniform(0, 2 * np.pi, (n_signals, 40))
     def u(t):
         sins = np.sin(2 * np.pi * i * .1 * t + phi)
         out = np.sum(sins, axis=-1) * amplitude
@@ -196,12 +195,15 @@ def visualize_trajectory(model, forecast_examples, steps, dt, trajectories):
     for j in range(forecast_examples):
         torch.cuda.empty_cache()
 
-        fig, axs = plt.subplots(X.shape[-1], 1, figsize=(30, 10))
+        fig, axs = plt.subplots(X.shape[-1] + u.shape[-1], 1, figsize=(30, 10))
         fig.suptitle(f'Trajectory example', fontsize=16)
 
         for i in range(X.shape[-1]):
             axs[i].plot(t, X[j, :, i], linestyle="dashed", color="red", label=f"X_{i}", linewidth=4)
             axs[i].plot(t, X_pred[j, :, i], linestyle="dotted", color="blue", label=f"X_pred_{i}", linewidth=4)
+        for k in range(u.shape[-1]):
+            col = ["green", "orange", "purple", "black"]
+            axs[X.shape[-1] + k].plot(t, u[j, :, k], linestyle="solid", color=col[k], label=f"u_{k}", linewidth=2)
         buf = BytesIO()
         fig.savefig(buf, format='png')
         buf.seek(0)  # Rewind the buffer to the beginning
@@ -268,3 +270,4 @@ if __name__ == "__main__":
     plt.plot(t, [u(tt)[0] for tt in t])
     plt.plot(t, [u(tt)[1] for tt in t])
     plt.show()
+    print(np.mean(u, axis=0))

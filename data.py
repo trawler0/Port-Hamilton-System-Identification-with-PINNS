@@ -45,13 +45,14 @@ class BaseDataGenerator:
         return np.stack(xdot_hat)
 
     def generate_trajectory(self, x0, u=None):
-        t = np.linspace(0, self.simulation_time, self.num_steps)
+        t_ = np.linspace(0, self.simulation_time, self.num_steps)
         dynamics = partial(self.system_dynamics, u=u)
         if u is None:
             u_out = np.zeros((self.num_steps, 1))
         else:
-            u_out = np.stack([u(t) for t in t])
-        return odeint(dynamics, x0, t), u_out
+            u_out = np.stack([u(t) for t in t_])
+        return odeint(dynamics, x0, t_), u_out
+
 
     def get_data(self, X0):
         all_X = []
@@ -64,8 +65,8 @@ class BaseDataGenerator:
         for j, x0 in enumerate(tqdm(X0)):
             u = self.generate_signal(seed=j) if self.generate_signal is not None else None
             X, u = self.generate_trajectory(x0, u)
-            xdot = (X[1:] - X[:-1]) / dt
-            # xdot = self.__call__(X[:-1], u[:-1])
+            #xdot = (X[1:] - X[:-1]) / dt      -    this is not any good
+            xdot = self.__call__(X[:-1], u[:-1])
             y = np.stack([self.y(x) for x in X])
             trajectories.append((X, u, y))
             all_X.append(X[:-1])
@@ -212,14 +213,14 @@ def simple_experiment(name, simulation_time, num_steps, **kwargs):
         masses = kwargs.pop("masses", (1., 1.5))
         spring_constants = kwargs.pop("spring_constants", (1., .1))
         damping = kwargs.pop("damping", 2.)
-        get_u = partial(multi_sin_signal, n_signals=2, amplitude=kwargs.pop("amplitude", .2))
+        get_u = partial(multi_sin_signal, n_signals=2, amplitude=kwargs.pop("amplitude", .5))
         return CoupledSpringMassDamper(G, masses, spring_constants, damping, simulation_time, num_steps, get_u)
     elif name == "ball":
         m = kwargs.pop("m", 1.)  # Hannes: 0.012, Achraf: 1.
         R = kwargs.pop("R", .1)  # Hannes: 0.1, Achraf: 0.1
         c = kwargs.pop("c", 1.)  # Hannes: 0.1, Achraf: 1.
         G = kwargs.pop("G", np.array([[0], [0], [1]]))
-        get_u = partial(multi_sin_signal, amplitude=kwargs.pop("amplitude", .2))
+        get_u = partial(multi_sin_signal, amplitude=kwargs.pop("amplitude", .5))
         return MagneticBall(m, R, c, G, simulation_time, num_steps, get_u)
     elif name == "motor":
         J_m = kwargs.pop("J_m", 1)
@@ -228,7 +229,7 @@ def simple_experiment(name, simulation_time, num_steps, **kwargs):
         r = kwargs.pop("r", 1)
         Phi = kwargs.pop("Phi", 1)
         G = kwargs.pop("G", np.array([[1, 0], [0, 1], [0, 0]]))
-        get_u = partial(multi_sin_signal, n_signals=2, amplitude=kwargs.pop("amplitude", .2))
+        get_u = partial(multi_sin_signal, n_signals=2, amplitude=kwargs.pop("amplitude", .5))
         return PMSM(J_m, L, beta, r, Phi, G, simulation_time, num_steps, get_u)
     else:
         raise NotImplementedError("Experiment not implemented")
@@ -278,7 +279,7 @@ if __name__ == "__main__":
         X = X[:-1]
         u = u[:-1]
 
-        for k in range(1):
+        for k in range(X.shape[-1]):
             plt.plot(X[:, k], label=f"X_{k}")
             plt.plot(xdot[:, k], label=f"xdot_{k}")
         plt.plot(y[:, 0], label="y")

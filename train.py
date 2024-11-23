@@ -8,7 +8,7 @@ from utils import normalized_mse, normalized_mae
 class TrainingModule(LightningModule):
 
 
-    def __init__(self, model, loss_fn="mse", lr=1e-3, weight_decay=0., output_weight=.1):
+    def __init__(self, model, loss_fn="mse", lr=1e-3, weight_decay=0., output_weight=.0):
 
         super(TrainingModule, self).__init__()
         self.model = model
