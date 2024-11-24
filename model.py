@@ -428,6 +428,7 @@ class PHNNModel(nn.Module):
         J_hat = self.J(x, grad_H)
         R_hat = self.R(x, grad_H)
         G = self.G(x)
+
         G = G.view(G.size(0), G.size(1) // u.size(-1), u.size(-1))
 
         y = (G.transpose(1, 2) @ grad_H.unsqueeze(-1)).squeeze(-1)
@@ -447,7 +448,7 @@ class PHNNModel(nn.Module):
 
 
 if __name__ == "__main__":
-    model = PHNNModel(3, 64, J="linear", R="linear", grad_H="gradient", G="linear", excitation="mlp", u_dim=1)
+    model = PHNNModel(3, 64, J="linear", R="linear", grad_H="gradient", G="linear", excitation="mlp", u_dim=2)
     x = torch.randn(10, 3)
-    u = torch.randn(10, 1)
+    u = torch.randn(10, 2)
     print(model(x, u))

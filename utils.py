@@ -1,3 +1,5 @@
+from signal import signal
+
 import numpy as np
 import torch
 from copy import deepcopy
@@ -35,17 +37,30 @@ def multi_sin_signal(n_signals=1, amplitude=.2, seed=None):
 
 
 @torch.no_grad()
-def forecast(model, X0, u, dt, steps, clamp=10.):
+def forecast(model, X0, u, dt, signal, steps, clamp=10.):
     model.eval()
     X = torch.zeros(X0.shape[0], steps, X0.shape[-1])
     u = torch.tensor(u)
     X[:, 0] = torch.tensor(X0)
+    t = 0
     for i in tqdm(range(0, steps-1)):
         X = X.clone().detach()
+        """# first order approximation
         with torch.autograd.enable_grad():
             dxdt = model(X[:, i].float(), u[:, i].float())[0]
-        X[:, i+1] = dxdt * dt + X[:, i]
+        X[:, i+1] = dxdt * dt + X[:, i]"""
+        # runge kutta
+        u0 = torch.stack([torch.tensor(sig(t)) for sig in signal]).float()
+        u_mid = torch.stack([torch.tensor(sig(t + dt/2)) for sig in signal]).float()
+        u_end = torch.stack([torch.tensor(sig(t + dt)) for sig in signal]).float()
+        k1 = model(X[:, i], u0)[0]
+        k2 = model(X[:, i] + k1 * dt / 2, u_mid)[0]
+        k3 = model(X[:, i] + k2 * dt / 2, u_mid)[0]
+        k4 = model(X[:, i] + k3 * dt, u_end)[0]
+        X[:, i+1] = X[:, i] + (k1 + 2 * k2 + 2 * k3 + k4) * dt / 6
+
         X[:, i+1] = torch.clamp(X[:, i+1], -clamp, clamp)
+        t += dt
     return X
 
 
@@ -166,10 +181,10 @@ def compute_metrics(model, trajectories, dt, X, u, xdot, y):
         "output_mae_rel": output_mae_rel,
         "output_mse_rel": output_mse_rel
     }
-    X, u, y = np.stack([t[0] for t in trajectories]), np.stack([t[1] for t in trajectories]), np.stack(
-        [t[2] for t in trajectories])
+    X, u, y, signal = np.stack([t[0] for t in trajectories]), np.stack([t[1] for t in trajectories]), np.stack(
+        [t[2] for t in trajectories]), [t[3] for t in trajectories]
     X0 = X[:, 0]
-    X_pred = forecast(model, X0, u, dt, X.shape[1]).detach().numpy()
+    X_pred = forecast(model, X0, u, dt, signal, X.shape[1]).detach().numpy()
     forecast_mae_rel = normalized_mae(torch.tensor(X_pred), torch.tensor(X)).item()
     forecast_mse_rel = normalized_mse(torch.tensor(X_pred), torch.tensor(X)).item()
     forecast_mae = torch.abs(torch.tensor(X_pred) - torch.tensor(X)).mean().item()
@@ -189,9 +204,9 @@ def visualize_trajectory(model, forecast_examples, steps, dt, trajectories):
 
     t = np.array([dt * s for s in range(steps)])
 
-    X, u, y = np.stack([t[0] for t in trajectories]), np.stack([t[1] for t in trajectories]), np.stack([t[2] for t in trajectories])
+    X, u, y, signal = np.stack([t[0] for t in trajectories]), np.stack([t[1] for t in trajectories]), np.stack([t[2] for t in trajectories]), [t[3] for t in trajectories]
     X0 = X[:, 0]
-    X_pred = forecast(model, X0, u, dt, steps).detach().numpy()
+    X_pred = forecast(model, X0, u, dt, signal, steps).detach().numpy()
     for j in range(forecast_examples):
         torch.cuda.empty_cache()
 

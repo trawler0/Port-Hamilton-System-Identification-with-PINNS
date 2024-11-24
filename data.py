@@ -51,7 +51,7 @@ class BaseDataGenerator:
             u_out = np.zeros((self.num_steps, 1))
         else:
             u_out = np.stack([u(t) for t in t_])
-        return odeint(dynamics, x0, t_), u_out
+        return odeint(dynamics, x0, t_), u_out, u
 
 
     def get_data(self, X0):
@@ -64,11 +64,11 @@ class BaseDataGenerator:
         trajectories = []
         for j, x0 in enumerate(tqdm(X0)):
             u = self.generate_signal(seed=j) if self.generate_signal is not None else None
-            X, u = self.generate_trajectory(x0, u)
+            X, u, signal = self.generate_trajectory(x0, u)
             #xdot = (X[1:] - X[:-1]) / dt      -    this is not any good
             xdot = self.__call__(X[:-1], u[:-1])
             y = np.stack([self.y(x) for x in X])
-            trajectories.append((X, u, y))
+            trajectories.append((X, u, y, signal))
             all_X.append(X[:-1])
             all_u.append(u[:-1])
             all_xdot.append(xdot)
@@ -272,7 +272,7 @@ if __name__ == "__main__":
     print(np.mean(np.abs(xdot_hat - xdot) / std), np.mean(np.abs(xdot_hat - xdot)))
 
     for j in range(1):
-        X, u, y = trajectories[j]
+        X, u, y, _ = trajectories[j]
         dt = 1 / 100
         xdot = (X[1:] - X[:-1]) / dt
         X += get_uniform_white_noise(X, a)

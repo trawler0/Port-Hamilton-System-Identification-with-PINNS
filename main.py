@@ -11,8 +11,8 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--name", type=str, default="ball")
-parser.add_argument("--num_trajectories", type=int, default=10)
-parser.add_argument("--num_val_trajectories", type=int, default=1000)
+parser.add_argument("--num_trajectories", type=int, default=100)
+parser.add_argument("--num_val_trajectories", type=int, default=100)
 parser.add_argument("--hidden_dim", type=int, default=64)
 parser.add_argument("--J", type=str, default="sigmoid")
 parser.add_argument("--R", type=str, default="sigmoid")
@@ -23,7 +23,7 @@ parser.add_argument("--grad_H", type=str, default="gradient")
 parser.add_argument("--time", type=float, default=10)
 parser.add_argument("--steps", type=int, default=None)
 parser.add_argument("--lr", type=float, default=5e-3)
-parser.add_argument("--epochs", type=int, default=500)
+parser.add_argument("--epochs", type=int, default=20)
 parser.add_argument("--criterion", type=str, default="normalized_mse")
 parser.add_argument("--batch_size", type=int, default=256)
 parser.add_argument("--seed", type=int, default=1)
@@ -93,8 +93,8 @@ with mlflow.start_run(run_name=args.run_name) as run:
     model = TrainingModule(model, loss_fn=args.criterion, lr=args.lr, weight_decay=args.weight_decay, output_weight=args.output_weight)
     trainer = Trainer(max_epochs=args.epochs//args.repeat, enable_checkpointing=False, logger=False, accelerator="cpu", gradient_clip_val=1)
     trainer.fit(model, train_loader)
-    #torch.save(model.model.state_dict(), args.checkpoint)
-    #model.model.load_state_dict(torch.load(args.checkpoint))
+    torch.save(model.model.state_dict(), args.checkpoint)
+    model.model.load_state_dict(torch.load(args.checkpoint))
 
     metrics = compute_metrics(model, trajectories_val, dt, X_val, u_val, xdot_val, y_val)
     print(metrics)
@@ -108,7 +108,7 @@ with mlflow.start_run(run_name=args.run_name) as run:
     generator_val = simple_experiment(name, time, steps)
     _, _, _, _, trajectories_val = generator_val.get_data(X0_val[:forecast_examples])
     if args.dB is not None:
-        trajectories_val = [(x + get_uniform_white_noise(x, a), u, y) for x, u, y in trajectories_val]
+        trajectories_val = [(x + get_uniform_white_noise(x, a), u, y, signal) for x, u, y, signal in trajectories_val]
 
     visualize_trajectory(model, forecast_examples, steps, dt, trajectories_val)
 
