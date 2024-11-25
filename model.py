@@ -76,9 +76,9 @@ class MLP(nn.Sequential):
 
 class Baseline(nn.Module):
 
-    def __init__(self, input_dim, hidden_dim, u_dim):
+    def __init__(self, input_dim, hidden_dim, u_dim, depth):
         super(Baseline, self).__init__()
-        self.mlp = MLP(input_dim + u_dim, hidden_dim, input_dim + u_dim, depth=3)
+        self.mlp = MLP(input_dim + u_dim, hidden_dim, input_dim + u_dim, depth=depth)
 
     def forward(self, x, u):
         u_dim = u.shape[-1]
@@ -148,7 +148,7 @@ class ModelOld(nn.Module):
 
 class J_Sigmoid(nn.Module):
 
-    def __init__(self, input_dim, hidden_dim, excitation="linear"):
+    def __init__(self, input_dim, hidden_dim, depth, excitation="linear"):
         super().__init__()
         self.input_dim = input_dim
         self.J1 = nn.Parameter(torch.randn(input_dim, input_dim + hidden_dim).T)
@@ -156,11 +156,7 @@ class J_Sigmoid(nn.Module):
         if excitation == "linear":
             self.J_sigma = nn.Linear(input_dim, hidden_dim)
         elif excitation == "mlp":
-            self.J_sigma = nn.Sequential(
-                nn.Linear(input_dim, hidden_dim),
-                nn.SiLU(inplace=True),
-                nn.Linear(hidden_dim, hidden_dim)
-            )
+            self.J_sigma = MLP(input_dim, hidden_dim, hidden_dim, depth=depth)
 
         nn.init.kaiming_normal_(self.J1)
         nn.init.kaiming_normal_(self.J2)
@@ -185,18 +181,14 @@ class J_Sigmoid(nn.Module):
 
 class R_Sigmoid(nn.Module):
 
-    def __init__(self, input_dim, hidden_dim, excitation="linear"):
+    def __init__(self, input_dim, hidden_dim, depth, excitation="linear"):
         super().__init__()
         self.input_dim = input_dim
         self.R_ = nn.Parameter(torch.randn(input_dim, input_dim + hidden_dim).T)
         if excitation == "linear":
             self.R_sigma = nn.Linear(input_dim, hidden_dim)
         elif excitation == "mlp":
-            self.R_sigma = nn.Sequential(
-                nn.Linear(input_dim, hidden_dim),
-                nn.SiLU(inplace=True),
-                nn.Linear(hidden_dim, hidden_dim)
-            )
+            self.R_sigma = MLP(input_dim, hidden_dim, hidden_dim, depth=depth)
 
         nn.init.kaiming_normal_(self.R_)
 
@@ -283,9 +275,10 @@ class JMatmul(nn.Module):
             self,
             input_dim,
             hidden_dim,
+            depth,
     ):
         super().__init__()
-        self.J_ = MLP(input_dim, hidden_dim, ((input_dim - 1) * input_dim) // 2, 1)
+        self.J_ = MLP(input_dim, hidden_dim, ((input_dim - 1) * input_dim) // 2, depth)
         self.vsu = VTU(input_dim, strict=True)
 
     def forward(self, x, grad_H):
@@ -305,9 +298,10 @@ class RMatmul(nn.Module):
             self,
             input_dim,
             hidden_dim,
+            depth
     ):
         super().__init__()
-        self.R_ = MLP(input_dim, hidden_dim, ((input_dim + 1) * input_dim) // 2, 1)
+        self.R_ = MLP(input_dim, hidden_dim, ((input_dim + 1) * input_dim) // 2, depth)
         self.vtu = VTU(input_dim)
 
     def forward(self, x, grad_H):
@@ -326,9 +320,10 @@ class RMatmulRescale(nn.Module):
             self,
             input_dim,
             hidden_dim,
+            depth
     ):
         super().__init__()
-        self.R_ = MLP(input_dim, hidden_dim, ((input_dim + 1) * input_dim) // 2, 1)
+        self.R_ = MLP(input_dim, hidden_dim, ((input_dim + 1) * input_dim) // 2, depth)
         self.log_tij = torch.nn.Parameter(torch.randn(1, input_dim, input_dim))
         self.bij = torch.nn.Parameter(torch.randn(1, input_dim, input_dim))
         self.vtu = VTU(input_dim)
@@ -347,9 +342,9 @@ class RMatmulRescale(nn.Module):
 # do not know what this represents, it is not a quadratic Hamiltonian
 class Grad_HMatmul(nn.Module):
 
-    def __init__(self, input_dim, hidden_dim):
+    def __init__(self, input_dim, hidden_dim, depth):
         super().__init__()
-        self.Q = MLP(input_dim, hidden_dim, ((input_dim + 1) * input_dim) // 2, 1)
+        self.Q = MLP(input_dim, hidden_dim, ((input_dim + 1) * input_dim) // 2, depth)
         self.vtu = VTU(input_dim)
 
     def forward(self, x):
@@ -363,9 +358,9 @@ class Grad_HMatmul(nn.Module):
 
 class Grad_H(nn.Module):
 
-    def __init__(self, input_dim, hidden_dim):
+    def __init__(self, input_dim, hidden_dim, depth):
         super().__init__()
-        self.H = MLP(input_dim, hidden_dim, 1, 1)
+        self.H = MLP(input_dim, hidden_dim, 1, depth)
 
     def forward(self, x):
         with torch.enable_grad():
@@ -383,41 +378,41 @@ class Grad_H(nn.Module):
 
 class PHNNModel(nn.Module):
 
-    def __init__(self, input_dim, hidden_dim, J="sigmoid", R="sigmoid", grad_H="gradient", G="mlp", excitation="linear",
+    def __init__(self, input_dim, hidden_dim, depth, J="sigmoid", R="sigmoid", grad_H="gradient", G="mlp", excitation="linear",
                  u_dim=1):
         super().__init__()
         if J == "sigmoid":
-            self.J = J_Sigmoid(input_dim, hidden_dim, excitation)
+            self.J = J_Sigmoid(input_dim, hidden_dim, depth, excitation)
         elif J == "linear":
             self.J = JLinear(input_dim)
         elif J == "matmul":
-            self.J = JMatmul(input_dim, hidden_dim)
+            self.J = JMatmul(input_dim, hidden_dim, depth)
         else:
             raise ValueError("Unknown J")
 
         if R == "sigmoid":
-            self.R = R_Sigmoid(input_dim, hidden_dim, excitation)
+            self.R = R_Sigmoid(input_dim, hidden_dim, depth, excitation)
         elif R == "linear":
             self.R = RLinear(input_dim)
         elif R == "matmul":
-            self.R = RMatmul(input_dim, hidden_dim)
+            self.R = RMatmul(input_dim, hidden_dim, depth)
         elif R == "matmul_rescale":
-            self.R = RMatmulRescale(input_dim, hidden_dim)
+            self.R = RMatmulRescale(input_dim, hidden_dim, depth)
         else:
             raise ValueError("Unknown R")
 
         if grad_H == "gradient":
-            self.grad_H = Grad_H(input_dim, hidden_dim)
+            self.grad_H = Grad_H(input_dim, hidden_dim, depth)
         elif grad_H == "linear":
             self.grad_H = Grad_HLinear(input_dim)
         # ?
         elif grad_H == "matmul":
-            self.grad_H = Grad_HMatmul(input_dim, hidden_dim)
+            self.grad_H = Grad_HMatmul(input_dim, hidden_dim, depth)
         else:
             raise ValueError("Unknown grad_H")
 
         if G == "mlp":
-            self.G = MLP(input_dim, hidden_dim, input_dim * u_dim, 1)
+            self.G = MLP(input_dim, hidden_dim, input_dim * u_dim, depth)
         elif G == "linear":
             self.G = GLinear(input_dim * u_dim)
         else:

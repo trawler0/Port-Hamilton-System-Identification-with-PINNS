@@ -14,8 +14,9 @@ parser.add_argument("--name", type=str, default="ball")
 parser.add_argument("--num_trajectories", type=int, default=100)
 parser.add_argument("--num_val_trajectories", type=int, default=100)
 parser.add_argument("--hidden_dim", type=int, default=64)
-parser.add_argument("--J", type=str, default="sigmoid")
-parser.add_argument("--R", type=str, default="sigmoid")
+parser.add_argument("--depth", type=int, default=3)
+parser.add_argument("--J", type=str, default="matmul")
+parser.add_argument("--R", type=str, default="matmul")
 parser.add_argument("--G", type=str, default="mlp")
 parser.add_argument("--output-weight", type=float, default=.25)
 parser.add_argument("--excitation", type=str, default="mlp")
@@ -23,7 +24,7 @@ parser.add_argument("--grad_H", type=str, default="gradient")
 parser.add_argument("--time", type=float, default=10)
 parser.add_argument("--steps", type=int, default=None)
 parser.add_argument("--lr", type=float, default=5e-3)
-parser.add_argument("--epochs", type=int, default=20)
+parser.add_argument("--epochs", type=int, default=50)
 parser.add_argument("--criterion", type=str, default="normalized_mse")
 parser.add_argument("--batch_size", type=int, default=256)
 parser.add_argument("--seed", type=int, default=1)
@@ -85,9 +86,9 @@ with mlflow.start_run(run_name=args.run_name) as run:
     val_loader = torch.utils.data.DataLoader(val_ds, batch_size=len(val_ds), shuffle=False)
 
     if args.baseline:
-        model = Baseline(DIM, args.hidden_dim, sigs)
+        model = Baseline(DIM, args.hidden_dim, sigs, args.depth)
     else:
-        model = PHNNModel(DIM, args.hidden_dim, J=args.J, R=args.R, grad_H=args.grad_H, G=args.G,
+        model = PHNNModel(DIM, args.hidden_dim, args.depth, J=args.J, R=args.R, grad_H=args.grad_H, G=args.G,
                           excitation=args.excitation, u_dim=sigs)
 
     model = TrainingModule(model, loss_fn=args.criterion, lr=args.lr, weight_decay=args.weight_decay, output_weight=args.output_weight)
