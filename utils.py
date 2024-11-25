@@ -181,7 +181,7 @@ def compute_metrics(model, trajectories, dt, X, u, xdot, y):
         "output_mae_rel": output_mae_rel,
         "output_mse_rel": output_mse_rel
     }
-    X, u, y, signal = np.stack([t[0] for t in trajectories]), np.stack([t[1] for t in trajectories]), np.stack(
+    """X, u, y, signal = np.stack([t[0] for t in trajectories]), np.stack([t[1] for t in trajectories]), np.stack(
         [t[2] for t in trajectories]), [t[3] for t in trajectories]
     X0 = X[:, 0]
     X_pred = forecast(model, X0, u, dt, signal, X.shape[1]).detach().numpy()
@@ -192,7 +192,7 @@ def compute_metrics(model, trajectories, dt, X, u, xdot, y):
     out_dict["forecast_mae"] = forecast_mae
     out_dict["forecast_mse"] = forecast_mse
     out_dict["forecast_mae_rel"] = forecast_mae_rel
-    out_dict["forecast_mse_rel"] = forecast_mse_rel
+    out_dict["forecast_mse_rel"] = forecast_mse_rel"""
 
     if mlflow.active_run() is not None:
         mlflow.log_metrics(out_dict)
