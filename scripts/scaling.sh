@@ -25,7 +25,6 @@ python main.py --name ball --num_trajectories 30 --num_val_trajectories 1000 --l
 python main.py --name ball --num_trajectories 100 --num_val_trajectories 1000 --lr 1e-3 --epochs 50 --repeat 1 --J matmul  --R matmul  --G mlp --output-weight .25 --run_name ball_matmul_100 --tag scaling
 python main.py --name ball --num_trajectories 300 --num_val_trajectories 1000 --lr 1e-3 --epochs 20 --repeat 1 --J matmul  --R matmul  --G mlp --output-weight .25 --run_name ball_matmul_300 --tag scaling
 python main.py --name ball --num_trajectories 1000 --num_val_trajectories 1000 --lr 1e-3 --epochs 20 --repeat 1 --J matmul  --R matmul  --G mlp --output-weight .25 --run_name ball_matmul_1000 --tag scaling
-python main.py --name ball --num_trajectories 3000 --num_val_trajectories 1000 --lr 1e-3 --epochs 10 --repeat 1 --J matmul  --R matmul  --G mlp --output-weight .25 --run_name ball_matmul_3000 --tag scaling
 
 # prior
 python main.py --name ball --num_trajectories 1 --num_val_trajectories 1000 --lr 1e-3 --epochs 2000 --repeat 50 --J linear  --R sigmoid  --G linear --grad_H linear --output-weight .25 --run_name ball_prior_1 --tag scaling --weight_decay 1e-3

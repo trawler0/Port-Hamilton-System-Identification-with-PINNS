@@ -216,9 +216,17 @@ def visualize_trajectory(model, forecast_examples, steps, dt, trajectories):
         for i in range(X.shape[-1]):
             axs[i].plot(t, X[j, :, i], linestyle="dashed", color="red", label=f"X_{i}", linewidth=4)
             axs[i].plot(t, X_pred[j, :, i], linestyle="dotted", color="blue", label=f"X_pred_{i}", linewidth=4)
+            axs[i].set_xlabel("Time")
+            axs[i].set_ylabel(f"X_{i}")
+            axs[i].set_title(f"Trajectory example {j + 1}")
+            axs[i].grid(True)
         for k in range(u.shape[-1]):
             col = ["green", "orange", "purple", "black"]
             axs[X.shape[-1] + k].plot(t, u[j, :, k], linestyle="solid", color=col[k], label=f"u_{k}", linewidth=2)
+            axs[X.shape[-1] + k].set_xlabel("Time")
+            axs[X.shape[-1] + k].set_ylabel(f"u_{k}")
+            axs[X.shape[-1] + k].set_title(f"Trajectory example {j + 1}")
+            axs[X.shape[-1] + k].grid(True)
         buf = BytesIO()
         fig.savefig(buf, format='png')
         buf.seek(0)  # Rewind the buffer to the beginning
@@ -249,6 +257,10 @@ def scatter(cp, c, name, samples=1000):
         fig, axs = plt.subplots(1, 1, figsize=(10, 10))
         fig.suptitle(f'{name}', fontsize=16)
         axs.scatter(c[:, j], cp[:, j])
+        axs.set_xlabel(f"True {name}_{j}")
+        axs.set_ylabel(f"Predicted {name}_{j}")
+        axs.set_title(f"Scatter plot of {name}_{j}")
+        axs.grid(True)
 
         buf = BytesIO()
         fig.savefig(buf, format='png')

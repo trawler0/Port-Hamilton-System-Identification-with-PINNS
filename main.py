@@ -10,9 +10,9 @@ import mlflow
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--name", type=str, default="ball")
+parser.add_argument("--name", type=str, default="spring")
 parser.add_argument("--num_trajectories", type=int, default=100)
-parser.add_argument("--num_val_trajectories", type=int, default=100)
+parser.add_argument("--num_val_trajectories", type=int, default=1000)
 parser.add_argument("--hidden_dim", type=int, default=64)
 parser.add_argument("--depth", type=int, default=3)
 parser.add_argument("--J", type=str, default="matmul")
