@@ -89,8 +89,8 @@ def plot_scaling():
         ax[0].set_xscale("log")
         ax[0].set_yscale("log")
         ax[0].set_title(f"{name.capitalize()} MAE")
-        ax[0].set_xlabel("Training size")
-        ax[0].set_ylabel("MAE")
+        ax[0].set_xlabel("Number of trajectories used for training")
+        ax[0].set_ylabel("normalized MAE")
         ax[0].grid()
         ax[0].legend()
 
@@ -101,8 +101,8 @@ def plot_scaling():
         ax[1].set_xscale("log")
         ax[1].set_yscale("log")
         ax[1].set_title(f"{name.capitalize()} MSE")
-        ax[1].set_xlabel("Training size")
-        ax[1].set_ylabel("MSE")
+        ax[1].set_xlabel("Number of trajectories used for training")
+        ax[1].set_ylabel("normalized MSE")
         ax[1].grid()
         ax[1].legend()
         # plt.show()
@@ -137,19 +137,19 @@ def recipe():
     fig, ax = plt.subplots(n, 3, figsize=(30, 30))
 
     for j in range(n):
-        ax[j, 0].plot(X_true[idx1, :5000, j], label="True", color="black")
+        ax[j, 0].plot(X_true[idx1, :10000, j], label="True", color="black")
         for run_name, X_pred in preds.items():
-            ax[j, 0].plot(X_pred[idx1, :5000, j], label=run_name)
+            ax[j, 0].plot(X_pred[idx1, :10000, j], label=run_name)
         ax[j, 0].legend()
-        ax[j, 1].plot(X_true[idx2, :5000, j], label="True", color="black")
+        ax[j, 1].plot(X_true[idx2, :10000, j], label="True", color="black")
         for run_name, X_pred in preds.items():
-            ax[j, 1].plot(X_pred[idx2, :5000, j], label=run_name)
+            ax[j, 1].plot(X_pred[idx2, :10000, j], label=run_name)
         ax[j, 1].legend()
-        ax[j, 2].plot(X_true[idx3, :5000, j], label="True", color="black")
+        ax[j, 2].plot(X_true[idx3, :10000, j], label="True", color="black")
         for run_name, X_pred in preds.items():
-            ax[j, 2].plot(X_pred[idx3, :5000, j], label=run_name)
+            ax[j, 2].plot(X_pred[idx3, :10000, j], label=run_name)
         ax[j, 2].legend()
-    # plt.show()
+    plt.show()
     plt.savefig(os.path.join("results", "recipe.png"))
 
 def compare():
@@ -197,11 +197,12 @@ def compare():
             ax[j, 2].plot(t, X_pred[idx3, :5000, j], label=run_name)
 
         ax[j, 2].legend()
+    # plt.show()
     plt.savefig(os.path.join("results", "compare.png"))
 
 
 
 noise_plots()
 plot_scaling()
-#recipe()
+recipe()
 compare()
