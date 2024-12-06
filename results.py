@@ -149,7 +149,7 @@ def recipe():
         for run_name, X_pred in preds.items():
             ax[j, 2].plot(X_pred[idx3, :10000, j], label=run_name)
         ax[j, 2].legend()
-    plt.show()
+    #plt.show()
     plt.savefig(os.path.join("results", "recipe.png"))
 
 def compare():
