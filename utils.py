@@ -1,5 +1,3 @@
-from signal import signal
-
 import numpy as np
 import torch
 from copy import deepcopy
@@ -8,6 +6,8 @@ import math
 import mlflow
 from io import BytesIO
 from matplotlib import pyplot as plt
+import tempfile
+import os
 
 
 def sample_initial_states(num_trajectories, dim, strategy):
@@ -37,7 +37,7 @@ def multi_sin_signal(n_signals=1, amplitude=.2, seed=None):
 
 
 @torch.no_grad()
-def forecast(model, X0, u, dt, signal, steps, clamp=10.):
+def forecast(model, X0, u, dt, signal, steps, clamp=10., a=None, b=None):
     model.eval()
     X = torch.zeros(X0.shape[0], steps, X0.shape[-1])
     u = torch.tensor(u)
@@ -53,6 +53,10 @@ def forecast(model, X0, u, dt, signal, steps, clamp=10.):
         u0 = torch.stack([torch.tensor(sig(t)) for sig in signal]).float()
         u_mid = torch.stack([torch.tensor(sig(t + dt/2)) for sig in signal]).float()
         u_end = torch.stack([torch.tensor(sig(t + dt)) for sig in signal]).float()
+        if a is not None:
+            u0 = torch.tensor(u[:, i]).float()
+            u_mid += torch.tensor(get_uniform_white_noise(u_mid, a)).float()
+            u_end += torch.tensor(u[:, i+1]).float()
         k1 = model(X[:, i], u0)[0]
         k2 = model(X[:, i] + k1 * dt / 2, u_mid)[0]
         k3 = model(X[:, i] + k2 * dt / 2, u_mid)[0]
@@ -160,53 +164,73 @@ def train(model, X, u, y, epochs, lr, weight_decay, batch_size, criterion=normal
 
 def compute_metrics(model, trajectories, dt, X, u, xdot, y):
 
-    xdot_pred, y_pred = model(X, u)
-    mae = torch.abs(xdot_pred - xdot).mean().item()
-    mse = ((xdot_pred - xdot)**2).mean().item()
-    mae_rel = normalized_mae(xdot_pred, xdot).item()
-    mse_rel = normalized_mse(xdot_pred, xdot).item()
+    if isinstance(model, list):
+        out_dict = {}
+        all_metrics = {}
+        for m in model:
+            metrics = compute_metrics(m, trajectories, dt, X, u, xdot, y)
+            for k, v in metrics.items():
+                if k not in all_metrics:
+                    all_metrics[k] = []
+                all_metrics[k].append(v)
+        for k, v in all_metrics.items():
+            out_dict[k] = np.mean(v)
+        return out_dict
+    else:
+        xdot_pred, y_pred = model(X, u)
+        mae = torch.abs(xdot_pred - xdot).mean().item()
+        mse = ((xdot_pred - xdot)**2).mean().item()
+        mae_rel = normalized_mae(xdot_pred, xdot).item()
+        mse_rel = normalized_mse(xdot_pred, xdot).item()
 
-    output_mae = torch.abs(y_pred - y).mean().item()
-    output_mse = ((y_pred - y)**2).mean().item()
-    output_mae_rel = normalized_mae(y_pred, y).item()
-    output_mse_rel = normalized_mse(y_pred, y).item()
+        output_mae = torch.abs(y_pred - y).mean().item()
+        output_mse = ((y_pred - y)**2).mean().item()
+        output_mae_rel = normalized_mae(y_pred, y).item()
+        output_mse_rel = normalized_mse(y_pred, y).item()
 
-    out_dict = {
-        "mae": mae,
-        "mse": mse,
-        "mae_rel": mae_rel,
-        "mse_rel": mse_rel,
-        "output_mae": output_mae,
-        "output_mse": output_mse,
-        "output_mae_rel": output_mae_rel,
-        "output_mse_rel": output_mse_rel
-    }
-    """X, u, y, signal = np.stack([t[0] for t in trajectories]), np.stack([t[1] for t in trajectories]), np.stack(
-        [t[2] for t in trajectories]), [t[3] for t in trajectories]
-    X0 = X[:, 0]
-    X_pred = forecast(model, X0, u, dt, signal, X.shape[1]).detach().numpy()
-    forecast_mae_rel = normalized_mae(torch.tensor(X_pred), torch.tensor(X)).item()
-    forecast_mse_rel = normalized_mse(torch.tensor(X_pred), torch.tensor(X)).item()
-    forecast_mae = torch.abs(torch.tensor(X_pred) - torch.tensor(X)).mean().item()
-    forecast_mse = ((torch.tensor(X_pred) - torch.tensor(X))**2).mean().item()
-    out_dict["forecast_mae"] = forecast_mae
-    out_dict["forecast_mse"] = forecast_mse
-    out_dict["forecast_mae_rel"] = forecast_mae_rel
-    out_dict["forecast_mse_rel"] = forecast_mse_rel"""
+        out_dict = {
+            "mae": mae,
+            "mse": mse,
+            "mae_rel": mae_rel,
+            "mse_rel": mse_rel,
+            "output_mae": output_mae,
+            "output_mse": output_mse,
+            "output_mae_rel": output_mae_rel,
+            "output_mse_rel": output_mse_rel
+        }
+        """X, u, y, signal = np.stack([t[0] for t in trajectories]), np.stack([t[1] for t in trajectories]), np.stack(
+            [t[2] for t in trajectories]), [t[3] for t in trajectories]
+        X0 = X[:, 0]
+        X_pred = forecast(model, X0, u, dt, signal, X.shape[1]).detach().numpy()
+        forecast_mae_rel = normalized_mae(torch.tensor(X_pred), torch.tensor(X)).item()
+        forecast_mse_rel = normalized_mse(torch.tensor(X_pred), torch.tensor(X)).item()
+        forecast_mae = torch.abs(torch.tensor(X_pred) - torch.tensor(X)).mean().item()
+        forecast_mse = ((torch.tensor(X_pred) - torch.tensor(X))**2).mean().item()
+        out_dict["forecast_mae"] = forecast_mae
+        out_dict["forecast_mse"] = forecast_mse
+        out_dict["forecast_mae_rel"] = forecast_mae_rel
+        out_dict["forecast_mse_rel"] = forecast_mse_rel"""
 
-    if mlflow.active_run() is not None:
-        mlflow.log_metrics(out_dict)
+        if mlflow.active_run() is not None:
+            mlflow.log_metrics(out_dict)
 
-    return out_dict
+        return out_dict
 
 
-def visualize_trajectory(model, forecast_examples, steps, dt, trajectories):
+def visualize_trajectory(model, forecast_examples, steps, dt, trajectories, a=None, b=None):
 
     t = np.array([dt * s for s in range(steps)])
 
     X, u, y, signal = np.stack([t[0] for t in trajectories]), np.stack([t[1] for t in trajectories]), np.stack([t[2] for t in trajectories]), [t[3] for t in trajectories]
     X0 = X[:, 0]
-    X_pred = forecast(model, X0, u, dt, signal, steps).detach().numpy()
+    X_pred = forecast(model, X0, u, dt, signal, steps, a=a, b=b).detach().numpy()
+    # log predictions as numpy
+    tmpdir = tempfile.TemporaryDirectory()
+    np.save(os.path.join(tmpdir.name, "X_pred.npy"), X_pred)
+    np.save(os.path.join(tmpdir.name, "X.npy"), X)
+    if mlflow.active_run() is not None:
+        mlflow.log_artifact(os.path.join(tmpdir.name, "X_pred.npy"))
+        mlflow.log_artifact(os.path.join(tmpdir.name, "X.npy"))
     for j in range(forecast_examples):
         torch.cuda.empty_cache()
 

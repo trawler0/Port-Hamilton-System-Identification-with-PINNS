@@ -1,3 +1,5 @@
+import math
+
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -301,41 +303,19 @@ class RMatmul(nn.Module):
             depth
     ):
         super().__init__()
-        self.R_ = MLP(input_dim, hidden_dim, ((input_dim + 1) * input_dim) // 2, depth)
-        self.vtu = VTU(input_dim)
+        self.R_ = MLP(input_dim, hidden_dim, input_dim ** 2, depth)
 
     def forward(self, x, grad_H):
-        R_ = self.vtu(self.R_(x))
-        return (grad_H.unsqueeze(1) @ R_ @ R_.permute(0, 2, 1)).squeeze(1)
+        R_ = self.R_(x)
+        d = int(math.sqrt(R_.size(-1)))
+        R_ = R_.view(R_.size(0), d, d)
+        return (grad_H.unsqueeze(1) @ R_ @ R_.permute(0, 2, 1)).squeeze(1) / math.sqrt(d)
 
     def reparam(self, x):
-        R_ = self.vtu(self.R_(x))
-        R = R_ @ R_.permute(0, 2, 1)
-        return R
-
-
-class RMatmulRescale(nn.Module):
-
-    def __init__(
-            self,
-            input_dim,
-            hidden_dim,
-            depth
-    ):
-        super().__init__()
-        self.R_ = MLP(input_dim, hidden_dim, ((input_dim + 1) * input_dim) // 2, depth)
-        self.log_tij = torch.nn.Parameter(torch.randn(1, input_dim, input_dim))
-        self.bij = torch.nn.Parameter(torch.randn(1, input_dim, input_dim))
-        self.vtu = VTU(input_dim)
-
-    def forward(self, x, grad_H):
-        R_ = self.vtu(self.R_(x))
-        R = R_ @ R_.permute(0, 2, 1) * torch.exp(self.log_tij) + self.bij
-        return (grad_H.unsqueeze(1) @ R).squeeze(1)
-
-    def reparam(self, x):
-        R_ = self.vtu(self.R_(x))
-        R = R_ @ R_.permute(0, 2, 1) * torch.exp(self.log_tij) + self.bij
+        R_ = self.R_(x)
+        d = int(math.sqrt(R_.size(-1)))
+        R_ = R_.view(R_.size(0), d, d)
+        R = R_ @ R_.permute(0, 2, 1) / math.sqrt(d)
         return R
 
 
@@ -396,8 +376,6 @@ class PHNNModel(nn.Module):
             self.R = RLinear(input_dim)
         elif R == "matmul":
             self.R = RMatmul(input_dim, hidden_dim, depth)
-        elif R == "matmul_rescale":
-            self.R = RMatmulRescale(input_dim, hidden_dim, depth)
         else:
             raise ValueError("Unknown R")
 

@@ -260,7 +260,7 @@ if __name__ == "__main__":
     generator = simple_experiment("spring", 10, 1000)
     X0 = sample_initial_states(20, 4, {"identifies": "uniform", "seed": 41})
     X, u, xdot, y, trajectories = generator.get_data(X0)
-    a = get_noise_bound(X, 20)
+    a = get_noise_bound(u, 5)
 
     power_X = np.mean(X ** 2)
     power_u = np.mean(u ** 2)
@@ -275,13 +275,13 @@ if __name__ == "__main__":
         X, u, y, _ = trajectories[j]
         dt = 1 / 100
         xdot = (X[1:] - X[:-1]) / dt
-        X += get_uniform_white_noise(X, a)
+        u += get_uniform_white_noise(u, a)
         X = X[:-1]
         u = u[:-1]
 
-        for k in range(X.shape[-1]):
+        """for k in range(X.shape[-1]):
             plt.plot(X[:, k], label=f"X_{k}")
-            plt.plot(xdot[:, k], label=f"xdot_{k}")
+            plt.plot(xdot[:, k], label=f"xdot_{k}")"""
         plt.plot(y[:, 0], label="y")
         plt.plot(u, label="u")
         plt.legend()
