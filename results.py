@@ -3,6 +3,8 @@ import numpy as np
 from matplotlib import pyplot as plt
 import os
 
+plt.style.use('seaborn-darkgrid')  # You can choose other styles like 'ggplot', 'classic', etc.
+
 if not os.path.exists("results"):
     os.makedirs("results")
 
@@ -73,40 +75,39 @@ def plot_scaling():
         assert matmul.keys() == baseline.keys() == sigmoid.keys() == prior.keys()
         sorted_keys = sorted(matmul.keys())
         mae_rel_baseline = [baseline[k][0] for k in sorted_keys]
-        mse_rel_baseline = [baseline[k][1] for k in sorted_keys]
-        mae_rel_sigmoid = [sigmoid[k][0] for k in sorted_keys]
-        mse_rel_sigmoid = [sigmoid[k][1] for k in sorted_keys]
         mae_rel_matmul = [matmul[k][0] for k in sorted_keys]
-        mse_rel_matmul = [matmul[k][1] for k in sorted_keys]
         mae_rel_prior = [prior[k][0] for k in sorted_keys]
-        mse_rel_prior = [prior[k][1] for k in sorted_keys]
 
-        fig, ax = plt.subplots(1, 2, figsize=(30, 15))
-        ax[0].plot(sorted_keys, mae_rel_baseline, label="Baseline")
-        ax[0].plot(sorted_keys, mae_rel_sigmoid, label="Sigmoid")
-        ax[0].plot(sorted_keys, mae_rel_matmul, label="Matmul")
-        ax[0].plot(sorted_keys, mae_rel_prior, label="Prior")
-        ax[0].set_xscale("log")
-        ax[0].set_yscale("log")
-        ax[0].set_title(f"{name.capitalize()} MAE")
-        ax[0].set_xlabel("Number of trajectories used for training")
-        ax[0].set_ylabel("normalized MAE")
-        ax[0].grid()
-        ax[0].legend()
 
-        ax[1].plot(sorted_keys, mse_rel_baseline, label="Baseline")
-        ax[1].plot(sorted_keys, mse_rel_sigmoid, label="Sigmoid")
-        ax[1].plot(sorted_keys, mse_rel_matmul, label="Matmul")
-        ax[1].plot(sorted_keys, mse_rel_prior, label="Prior")
-        ax[1].set_xscale("log")
-        ax[1].set_yscale("log")
-        ax[1].set_title(f"{name.capitalize()} MSE")
-        ax[1].set_xlabel("Number of trajectories used for training")
-        ax[1].set_ylabel("normalized MSE")
-        ax[1].grid()
-        ax[1].legend()
-        # plt.show()
+        # Create the figure and axis with an optimized size
+        fig, ax = plt.subplots(figsize=(12, 8))  # Adjusted from (30, 30) to (12, 8)
 
+        # Plotting the data with markers and increased line width for better visibility
+        ax.plot(sorted_keys, mae_rel_baseline, label="Baseline", marker='o', linewidth=2)
+        ax.plot(sorted_keys, mae_rel_matmul, label="Matmul", marker='s', linewidth=2)
+        ax.plot(sorted_keys, mae_rel_prior, label="Prior", marker='^', linewidth=2)
+
+        # Set log scales
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+
+        # Set title and labels with increased font sizes
+        ax.set_xlabel("Number of Trajectories Used for Training", fontsize=16)
+        ax.set_ylabel("Normalized MAE", fontsize=16)  # Added y-label for completeness
+
+        # Customize tick parameters for better readability
+        ax.tick_params(axis='both', which='major', labelsize=14)
+        ax.tick_params(axis='both', which='minor', labelsize=12)
+
+        # Enable and customize grid
+        ax.grid(True, which="both", ls="--", linewidth=0.5)
+
+        # Customize legend with larger font size and appropriate placement
+        ax.legend(fontsize=14, loc='best')  # 'best' lets matplotlib decide the optimal location
+
+        # Optional: Tight layout for better spacing
+        plt.tight_layout()
+        #plt.show()
 
         plt.savefig(os.path.join("results", f"{name}_scaling.png"))
 
@@ -132,23 +133,18 @@ def recipe():
                     preds[run_name] = X_pred
     n = X_pred.shape[-1]
     idx1 = 3
-    idx2 = 9
-    idx3 = 7
-    fig, ax = plt.subplots(n, 3, figsize=(30, 30))
-
-    for j in range(n):
-        ax[j, 0].plot(X_true[idx1, :10000, j], label="True", color="black")
+    state1 = 1
+    idx2 = 7
+    state2 = 3
+    fig, ax = plt.subplots(1, 2, figsize=(30, 15))
+    time = np.arange(len(X_true[idx1, :10000, state1])) * 0.01
+    for j, (idx, state) in enumerate([(idx1, state1), (idx2, state2)]):
+        ax[j].plot(time, X_true[idx, :10000, state], label="True", color="black")
         for run_name, X_pred in preds.items():
-            ax[j, 0].plot(X_pred[idx1, :10000, j], label=run_name)
-        ax[j, 0].legend()
-        ax[j, 1].plot(X_true[idx2, :10000, j], label="True", color="black")
-        for run_name, X_pred in preds.items():
-            ax[j, 1].plot(X_pred[idx2, :10000, j], label=run_name)
-        ax[j, 1].legend()
-        ax[j, 2].plot(X_true[idx3, :10000, j], label="True", color="black")
-        for run_name, X_pred in preds.items():
-            ax[j, 2].plot(X_pred[idx3, :10000, j], label=run_name)
-        ax[j, 2].legend()
+            ax[j].plot(time, X_pred[idx, :10000, state], label=run_name)
+        ax[j].set_xlabel("Time [s]")
+        ax[j].set_ylabel("State {}".format(state))
+        ax[j].legend()
     #plt.show()
     plt.savefig(os.path.join("results", "recipe.png"))
 
@@ -172,31 +168,20 @@ def compare():
                     X_true = np.load(artifact_file_path.replace("X_pred", "X"))
                     preds[run_name] = X_pred
 
-    idx1 = 8
-    idx2 = 12
-    idx3 = 11
+    idx1 = 12
+    state1 = 1
+    idx2 = 11
+    state2 = 0
     n = X_pred.shape[-1]
-    fig, ax = plt.subplots(n, 3, figsize=(30, 30))
-
-    for j in range(n):
-        for i in range(3):
-            ax[j, i].set_xlabel("Time [s]")
-            ax[j, i].set_ylabel("Trajectory")
-            ax[j, i].grid()
+    fig, ax = plt.subplots(1, 2, figsize=(30, 15))
+    for j, (idx, state) in enumerate([(idx1, state1), (idx2, state2)]):
+        ax[j].set_xlabel("Time [s]")
+        ax[j].set_ylabel("State {}".format(state))
         t = np.arange(5000) * 0.01
-        ax[j, 0].plot(t, X_true[idx1, :5000, j], label="True", color="black")
+        ax[j].plot(t, X_true[idx, :5000, state], label="True", color="black")
         for run_name, X_pred in preds.items():
-            ax[j, 0].plot(t, X_pred[idx1, :5000, j], label=run_name)
-        ax[j, 0].legend()
-        ax[j, 1].plot(t, X_true[idx2, :5000, j], label="True", color="black")
-        for run_name, X_pred in preds.items():
-            ax[j, 1].plot(t, X_pred[idx2, :5000, j], label=run_name)
-        ax[j, 1].legend()
-        ax[j, 2].plot(t, X_true[idx3, :5000, j], label="True", color="black")
-        for run_name, X_pred in preds.items():
-            ax[j, 2].plot(t, X_pred[idx3, :5000, j], label=run_name)
-
-        ax[j, 2].legend()
+            ax[j].plot(t, X_pred[idx, :5000, state], label=run_name)
+        ax[j].legend()
     # plt.show()
     plt.savefig(os.path.join("results", "compare.png"))
 
