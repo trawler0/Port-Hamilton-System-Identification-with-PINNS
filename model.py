@@ -87,7 +87,7 @@ class JLinear(nn.Module):
         return F.linear(grad_H, J)
 
     def reparam(self, x):
-        J = self.J_ - self.J_.T
+        J = (self.J_ - self.J_.T).T
         return J.unsqueeze(0).expand(x.size(0), -1, -1)
 
 
@@ -160,7 +160,7 @@ class JMatmul(nn.Module):
     def reparam(self, x):
         J_ = self.vsu(self.J_(x))
         J = J_ - J_.permute(0, 2, 1)
-        return J
+        return J.transpose(1, 2)
 
 
 class RMatmul(nn.Module):
@@ -227,7 +227,7 @@ class RQuadratic(nn.Module):
         x = torch.cat([x, torch.ones((B, 1), device=x.device)], dim=1)
         x = (x @ self.weight).view(-1, D, D)
         R = x @ x.transpose(1, 2) / math.sqrt(D)
-        return (R @ grad_H.unsqueeze(-1)).squeeze(-1)
+        return (grad_H.unsqueeze(1) @ R.T).squeeze(1)
 
     def reparam(self, x):
         B, D = x.size()
@@ -236,7 +236,19 @@ class RQuadratic(nn.Module):
         R = x @ x.transpose(1, 2) / math.sqrt(D)
         return R
 
+# one can often guess J from calculations with Poisson brackets
+class JSpring(nn.Module):
 
+    def __init__(self):
+        super().__init__()
+        J = torch.tensor([[0, 1, 0, 0], [0, 1, 0, 0], [0, 0, 0, 1], [0, 0, -1, 0]], dtype=torch.float32)
+        self.register_buffer("J", J)
+
+    def forward(self, x, grad_H):
+        return F.linear(grad_H, self.J.T)
+
+    def reparam(self, x):
+        return self.J
 
 class PHNNModel(nn.Module):
 
@@ -249,6 +261,8 @@ class PHNNModel(nn.Module):
             self.J = JMatmul(input_dim, hidden_dim, depth)
         elif J == "matmul_kan":
             self.J = JMatmul(input_dim, hidden_dim, depth, arch="kan")
+        elif J == "spring":
+            self.J = JSpring()
         else:
             raise ValueError("Unknown J")
 
@@ -306,7 +320,11 @@ class PHNNModel(nn.Module):
 
 
 if __name__ == "__main__":
-    model = PHNNModel(3, 64, 3, J="linear", R="quadratic", grad_H="gradient", G="linear", excitation="mlp", u_dim=2)
-    x = torch.randn(10, 3)
+    model = PHNNModel(4, 64, 3, J="spring", R="quadratic", grad_H="gradient", G="linear", excitation="mlp", u_dim=2)
+    x = torch.randn(10, 4)
     u = torch.randn(10, 2)
     print(model.reparam(x))
+
+    x = torch.randn(2, 4)
+    w = torch.randn(4, 4)
+    print(x @ w.T, F.linear(x, w))
