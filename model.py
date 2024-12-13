@@ -1,9 +1,9 @@
 import math
-
 import torch
 from torch import nn
 import torch.nn.functional as F
 from functools import partial
+from kan import KAN
 
 
 class VTU(nn.Module):
@@ -278,9 +278,13 @@ class JMatmul(nn.Module):
             input_dim,
             hidden_dim,
             depth,
+            arch="mlp"
     ):
         super().__init__()
-        self.J_ = MLP(input_dim, hidden_dim, ((input_dim - 1) * input_dim) // 2, depth)
+        if arch == "mlp":
+            self.J_ = MLP(input_dim, hidden_dim, ((input_dim - 1) * input_dim) // 2, depth)
+        elif arch == "kan":
+            self.J_ = KAN([input_dim] + [hidden_dim] * depth + [((input_dim - 1) * input_dim) // 2])
         self.vsu = VTU(input_dim, strict=True)
 
     def forward(self, x, grad_H):
@@ -300,10 +304,14 @@ class RMatmul(nn.Module):
             self,
             input_dim,
             hidden_dim,
-            depth
+            depth,
+            arch="mlp"
     ):
         super().__init__()
-        self.R_ = MLP(input_dim, hidden_dim, input_dim ** 2, depth)
+        if arch == "mlp":
+            self.R_ = MLP(input_dim, hidden_dim, input_dim ** 2, depth)
+        elif arch == "kan":
+            self.R_ = KAN([input_dim] + [hidden_dim] * depth + [input_dim ** 2])
 
     def forward(self, x, grad_H):
         R_ = self.R_(x)
@@ -322,9 +330,12 @@ class RMatmul(nn.Module):
 # do not know what this represents, it is not a quadratic Hamiltonian
 class Grad_HMatmul(nn.Module):
 
-    def __init__(self, input_dim, hidden_dim, depth):
+    def __init__(self, input_dim, hidden_dim, depth, arch="mlp"):
         super().__init__()
-        self.Q = MLP(input_dim, hidden_dim, ((input_dim + 1) * input_dim) // 2, depth)
+        if arch == "mlp":
+            self.Q = MLP(input_dim, hidden_dim, ((input_dim + 1) * input_dim) // 2, depth)
+        elif arch == "kan":
+            self.Q = KAN([input_dim] + [hidden_dim] * depth + [((input_dim + 1) * input_dim) // 2])
         self.vtu = VTU(input_dim)
 
     def forward(self, x):
@@ -338,9 +349,12 @@ class Grad_HMatmul(nn.Module):
 
 class Grad_H(nn.Module):
 
-    def __init__(self, input_dim, hidden_dim, depth):
+    def __init__(self, input_dim, hidden_dim, depth, arch="mlp"):
         super().__init__()
-        self.H = MLP(input_dim, hidden_dim, 1, depth)
+        if arch == "mlp":
+            self.H = MLP(input_dim, hidden_dim, 1, depth)
+        elif arch == "kan":
+            self.H = KAN([input_dim] + [hidden_dim] * depth + [1])
 
     def forward(self, x):
         with torch.enable_grad():
@@ -367,6 +381,8 @@ class PHNNModel(nn.Module):
             self.J = JLinear(input_dim)
         elif J == "matmul":
             self.J = JMatmul(input_dim, hidden_dim, depth)
+        elif J == "matmul_kan":
+            self.J = JMatmul(input_dim, hidden_dim, depth, arch="kan")
         else:
             raise ValueError("Unknown J")
 
@@ -376,11 +392,15 @@ class PHNNModel(nn.Module):
             self.R = RLinear(input_dim)
         elif R == "matmul":
             self.R = RMatmul(input_dim, hidden_dim, depth)
+        elif R == "matmul_kan":
+            self.R = RMatmul(input_dim, hidden_dim, depth, arch="kan")
         else:
             raise ValueError("Unknown R")
 
         if grad_H == "gradient":
             self.grad_H = Grad_H(input_dim, hidden_dim, depth)
+        elif grad_H == "gradient_kan":
+            self.grad_H = Grad_H(input_dim, hidden_dim, depth, arch="kan")
         elif grad_H == "linear":
             self.grad_H = Grad_HLinear(input_dim)
         # ?
@@ -391,6 +411,8 @@ class PHNNModel(nn.Module):
 
         if G == "mlp":
             self.G = MLP(input_dim, hidden_dim, input_dim * u_dim, depth)
+        elif G == "kan":
+            self.G = KAN([input_dim] + [hidden_dim] * depth + [input_dim * u_dim])
         elif G == "linear":
             self.G = GLinear(input_dim * u_dim)
         else:

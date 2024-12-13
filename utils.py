@@ -84,20 +84,6 @@ class Dataset(torch.utils.data.Dataset):
         return self.X[idx], self.u[idx], self.xdot[idx], self.y[idx]
 
 
-class TrajectoryDataset(torch.utils.data.Dataset):
-
-    def __init__(self, trajectories):
-        self.trajectories = trajectories
-
-
-    def __len__(self):
-        return len(self.trajectories)
-
-    def __getitem__(self, idx):
-        return self.trajectories[idx]
-
-
-
 def normalized_mse(x, target):
     std = target.std()
     return ((x - target) / (std + 1e-6)).pow(2).mean()
@@ -106,62 +92,7 @@ def normalized_mae(x, target):
     std = target.std()
     return ((x - target) / (std + 1e-6)).abs().mean()
 
-
-
-# this stuff is not working properly, but it would accelerate training
-# it is disposed to later
-
-class FasterLoader:
-
-    def __init__(self, X, u, y, batch_size):
-        self.X = X
-        self.u = u
-        self.y = y
-        self.batch_size = batch_size
-
-    def __iter__(self):
-        X, u, y = deepcopy(self.X), deepcopy(self.u), deepcopy(self.y)
-        idx = torch.randperm(len(X))
-        for i in range(len(X) // self.batch_size):
-            x_out = X[idx[i * self.batch_size: (i + 1) * self.batch_size]]
-            u_out = u[idx[i * self.batch_size: (i + 1) * self.batch_size]]
-            y_out = y[idx[i * self.batch_size: (i + 1) * self.batch_size]]
-            yield x_out, u_out, y_out
-
-    def __len__(self):
-        return len(self.X) // self.batch_size
-
-
-# disposed to later
-def train(model, X, u, y, epochs, lr, weight_decay, batch_size, criterion=normalized_mse):
-    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
-    loader = FasterLoader(X, u, y, batch_size)
-    total_steps = len(X) // batch_size * epochs
-    def lr_lambda(step, warmup=.1):
-        if step / total_steps < warmup:
-            return step / (total_steps * warmup)
-        actual_step = step - total_steps * warmup
-        actual_total = total_steps * (1 - warmup)
-        return .5 * (1 + math.cos(math.pi * actual_step / actual_total))
-
-    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
-    for epoch in range(epochs):
-        pbar = tqdm(loader)
-        model.train()
-        running_loss = 0
-        for i, (x, u, y) in enumerate(pbar):
-            optimizer.zero_grad()
-            y_hat = model(x, u)
-            loss = criterion(y_hat, y)
-            running_loss += loss.item()
-            loss.backward()
-            optimizer.step()
-            scheduler.step()
-            pbar.set_postfix({"loss": running_loss / (i + 1), "epoch": epoch, "lr": optimizer.param_groups[0]["lr"]})
-
-    return model
-
-
+@torch.no_grad()
 def compute_metrics(model, trajectories, dt, X, u, xdot, y):
 
     if isinstance(model, list):
@@ -177,7 +108,16 @@ def compute_metrics(model, trajectories, dt, X, u, xdot, y):
             out_dict[k] = np.mean(v)
         return out_dict
     else:
-        xdot_pred, y_pred = model(X, u)
+        N = len(X)
+        x_dot_pred = []
+        y_pred = []
+        for i in tqdm(range(N // 512 + 1)):
+            with torch.enable_grad():
+                out = model(X[i*512:(i+1)*512], u[i*512:(i+1)*512])
+            x_dot_pred.append(out[0].detach())
+            y_pred.append(out[1].detach())
+        xdot_pred = torch.cat(x_dot_pred, dim=0)
+        y_pred = torch.cat(y_pred, dim=0)
         mae = torch.abs(xdot_pred - xdot).mean().item()
         mse = ((xdot_pred - xdot)**2).mean().item()
         mae_rel = normalized_mae(xdot_pred, xdot).item()
