@@ -1,7 +1,9 @@
-#bash scripts/beta.sh
-#bash scripts/compare_trajectories.sh
-bash scripts/noise.sh
-bash scripts/prior_vs_default.sh
-#bash scripts/scaling.sh
+#bash scripts/beta.sh  # ball
+#bash scripts/compare_trajectories.sh  # ball
+bash scripts/noise.sh  # motor
+bash scripts/prior_vs_default.sh  # spring
+bash scripts/prior_comparison.sh  # spring
+#bash scripts/recipe.sh  # spring
+#bash scripts/scaling.sh  # motor
 
 

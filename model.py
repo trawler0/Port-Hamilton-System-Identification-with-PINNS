@@ -100,10 +100,10 @@ class RLinear(nn.Module):
         nn.init.kaiming_normal_(self.R_)
 
     def forward(self, x, grad_H):
-        return F.linear(F.linear(grad_H, self.R_), self.R_.T)
+        return F.linear(F.linear(grad_H, self.R_), self.R_.T) / math.sqrt(self.R_.size(0))
 
     def reparam(self, x):
-        R = self.R_ @ self.R_.T
+        R = self.R_ @ self.R_.T / math.sqrt(self.R_.size(0))
         return R.unsqueeze(0).expand(x.size(0), -1, -1)
 
 
@@ -192,26 +192,6 @@ class RMatmul(nn.Module):
         return R
 
 
-# do not know what this represents, it is not a quadratic Hamiltonian
-class Grad_HMatmul(nn.Module):
-
-    def __init__(self, input_dim, hidden_dim, depth, arch="mlp"):
-        super().__init__()
-        if arch == "mlp":
-            self.Q = MLP(input_dim, hidden_dim, ((input_dim + 1) * input_dim) // 2, depth)
-        elif arch == "kan":
-            self.Q = KAN([input_dim] + [hidden_dim] * depth + [((input_dim + 1) * input_dim) // 2])
-        self.vtu = VTU(input_dim)
-
-    def forward(self, x):
-        Q_ = self.vtu(self.Q(x))
-        Q = Q_.permute(0, 2, 1) @ Q_
-        return (x.unsqueeze(1) @ Q).squeeze(1)
-
-    def H(self, x):
-        return None
-
-
 class Grad_H(nn.Module):
 
     def __init__(self, input_dim, hidden_dim, depth, arch="mlp"):
@@ -234,10 +214,33 @@ class Grad_H(nn.Module):
             )[0]
         return grad_H
 
+# just for the spring
+class RQuadratic(nn.Module):
+
+    def __init__(self, D):
+        super().__init__()
+        self.weight = nn.Parameter(torch.randn(D+1, D**2))
+        nn.init.kaiming_normal_(self.weight)
+
+    def forward(self, x, grad_H):
+        B, D = x.size()
+        x = torch.cat([x, torch.ones((B, 1), device=x.device)], dim=1)
+        x = (x @ self.weight).view(-1, D, D)
+        R = x @ x.transpose(1, 2) / math.sqrt(D)
+        return (R @ grad_H.unsqueeze(-1)).squeeze(-1)
+
+    def reparam(self, x):
+        B, D = x.size()
+        x = torch.cat([x, torch.ones((B, 1), device=x.device)], dim=1)
+        x = (x @ self.weight).view(-1, D, D)
+        R = x @ x.transpose(1, 2) / math.sqrt(D)
+        return R
+
+
 
 class PHNNModel(nn.Module):
 
-    def __init__(self, input_dim, hidden_dim, depth, J="sigmoid", R="sigmoid", grad_H="gradient", G="mlp", excitation="linear",
+    def __init__(self, input_dim, hidden_dim, depth, J="default", R="default", grad_H="gradient", G="mlp", excitation="linear",
                  u_dim=1):
         super().__init__()
         if J == "linear":
@@ -251,6 +254,8 @@ class PHNNModel(nn.Module):
 
         if R == "linear":
             self.R = RLinear(input_dim)
+        elif R == "quadratic":
+            self.R = RQuadratic(input_dim)
         elif R == "matmul":
             self.R = RMatmul(input_dim, hidden_dim, depth)
         elif R == "matmul_kan":
@@ -264,9 +269,6 @@ class PHNNModel(nn.Module):
             self.grad_H = Grad_H(input_dim, hidden_dim, depth, arch="kan")
         elif grad_H == "linear":
             self.grad_H = Grad_HLinear(input_dim)
-        # ?
-        elif grad_H == "matmul":
-            self.grad_H = Grad_HMatmul(input_dim, hidden_dim, depth)
         else:
             raise ValueError("Unknown grad_H")
 
@@ -304,7 +306,7 @@ class PHNNModel(nn.Module):
 
 
 if __name__ == "__main__":
-    model = PHNNModel(3, 64, J="linear", R="linear", grad_H="gradient", G="linear", excitation="mlp", u_dim=2)
+    model = PHNNModel(3, 64, 3, J="linear", R="quadratic", grad_H="gradient", G="linear", excitation="mlp", u_dim=2)
     x = torch.randn(10, 3)
     u = torch.randn(10, 2)
-    print(model(x, u))
+    print(model.reparam(x))

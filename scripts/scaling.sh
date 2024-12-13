@@ -8,15 +8,6 @@ python main.py --name ball --num_trajectories 100 --num_val_trajectories 1000 --
 python main.py --name ball --num_trajectories 300 --num_val_trajectories 1000 --lr 1e-3 --epochs 100 --repeat 1 --J none  --R none  --G none --grad_H none --output-weight .25 --run_name ball_baseline_300 --experiment scaling --baseline
 python main.py --name ball --num_trajectories 1000 --num_val_trajectories 1000 --lr 1e-3 --epochs 50 --repeat 1 --J none  --R none  --G none --grad_H none --output-weight .25 --run_name ball_baseline_1000 --experiment scaling --baseline
 
-# sigmoid
-python main.py --name ball --num_trajectories 1 --num_val_trajectories 1000 --lr 1e-3 --epochs 10000 --repeat 50 --J sigmoid  --R sigmoid  --G mlp --output-weight .25 --run_name ball_sigmoid_1 --experiment scaling
-python main.py --name ball --num_trajectories 3 --num_val_trajectories 1000 --lr 1e-3 --epochs 3000 --repeat 20 --J sigmoid  --R sigmoid  --G mlp --output-weight .25 --run_name ball_sigmoid_3 --experiment scaling
-python main.py --name ball --num_trajectories 10 --num_val_trajectories 1000 --lr 1e-3 --epochs 1000 --repeat 10 --J sigmoid  --R sigmoid  --G mlp --output-weight .25 --run_name ball_sigmoid_10 --experiment scaling
-python main.py --name ball --num_trajectories 30 --num_val_trajectories 1000 --lr 1e-3 --epochs 500 --repeat 5 --J sigmoid  --R sigmoid  --G mlp --output-weight .25 --run_name ball_sigmoid_30 --experiment scaling
-python main.py --name ball --num_trajectories 100 --num_val_trajectories 1000 --lr 1e-3 --epochs 250 --repeat 1 --J sigmoid  --R sigmoid  --G mlp --output-weight .25 --run_name ball_sigmoid_100 --experiment scaling
-python main.py --name ball --num_trajectories 300 --num_val_trajectories 1000 --lr 1e-3 --epochs 100 --repeat 1 --J sigmoid  --R sigmoid  --G mlp --output-weight .25 --run_name ball_sigmoid_300 --experiment scaling
-python main.py --name ball --num_trajectories 1000 --num_val_trajectories 1000 --lr 1e-3 --epochs 50 --repeat 1 --J sigmoid  --R sigmoid  --G mlp --output-weight .25 --run_name ball_sigmoid_1000 --experiment scaling
-
 # matmul
 python main.py --name ball --num_trajectories 1 --num_val_trajectories 1000 --lr 1e-3 --epochs 10000 --repeat 50 --J matmul  --R matmul  --G mlp --output-weight .25 --run_name ball_matmul_1 --experiment scaling
 python main.py --name ball --num_trajectories 3 --num_val_trajectories 1000 --lr 1e-3 --epochs 3000 --repeat 20 --J matmul  --R matmul  --G mlp --output-weight .25 --run_name ball_matmul_3 --experiment scaling
@@ -45,14 +36,6 @@ python main.py --name spring --num_trajectories 100 --num_val_trajectories 1000 
 python main.py --name spring --num_trajectories 300 --num_val_trajectories 1000 --lr 1e-3 --epochs 100 --repeat 1 --J none  --R none  --G none --grad_H none --output-weight .25 --run_name spring_baseline_300 --experiment scaling --baseline
 python main.py --name spring --num_trajectories 1000 --num_val_trajectories 1000 --lr 1e-3 --epochs 50 --repeat 1 --J none  --R none  --G none --grad_H none --output-weight .25 --run_name spring_baseline_1000 --experiment scaling --baseline
 
-# sigmoid
-python main.py --name spring --num_trajectories 1 --num_val_trajectories 1000 --lr 1e-3 --epochs 10000 --repeat 50 --J sigmoid  --R sigmoid  --G mlp --output-weight .25 --run_name spring_sigmoid_1 --experiment scaling
-python main.py --name spring --num_trajectories 3 --num_val_trajectories 1000 --lr 1e-3 --epochs 3000 --repeat 20 --J sigmoid  --R sigmoid  --G mlp --output-weight .25 --run_name spring_sigmoid_3 --experiment scaling
-python main.py --name spring --num_trajectories 10 --num_val_trajectories 1000 --lr 1e-3 --epochs 1000 --repeat 10 --J sigmoid  --R sigmoid  --G mlp --output-weight .25 --run_name spring_sigmoid_10 --experiment scaling
-python main.py --name spring --num_trajectories 30 --num_val_trajectories 1000 --lr 1e-3 --epochs 500 --repeat 5 --J sigmoid  --R sigmoid  --G mlp --output-weight .25 --run_name spring_sigmoid_30 --experiment scaling
-python main.py --name spring --num_trajectories 100 --num_val_trajectories 1000 --lr 1e-3 --epochs 250 --repeat 1 --J sigmoid  --R sigmoid  --G mlp --output-weight .25 --run_name spring_sigmoid_100 --experiment scaling
-python main.py --name spring --num_trajectories 300 --num_val_trajectories 1000 --lr 1e-3 --epochs 100 --repeat 1 --J sigmoid  --R sigmoid  --G mlp --output-weight .25 --run_name spring_sigmoid_300 --experiment scaling
-python main.py --name spring --num_trajectories 1000 --num_val_trajectories 1000 --lr 1e-3 --epochs 50 --repeat 1 --J sigmoid  --R sigmoid  --G mlp --output-weight .25 --run_name spring_sigmoid_1000 --experiment scaling
 
 # matmul
 python main.py --name spring --num_trajectories 1 --num_val_trajectories 1000 --lr 1e-3 --epochs 10000 --repeat 50 --J matmul  --R matmul  --G mlp --output-weight .25 --run_name spring_matmul_1 --experiment scaling
@@ -81,15 +64,6 @@ python main.py --name motor --num_trajectories 30 --num_val_trajectories 1000 --
 python main.py --name motor --num_trajectories 100 --num_val_trajectories 1000 --lr 1e-3 --epochs 250 --repeat 1 --J none  --R none  --G none --grad_H none --output-weight .25 --run_name motor_baseline_100 --experiment scaling --baseline
 python main.py --name motor --num_trajectories 300 --num_val_trajectories 1000 --lr 1e-3 --epochs 100 --repeat 1 --J none  --R none  --G none --grad_H none --output-weight .25 --run_name motor_baseline_300 --experiment scaling --baseline
 python main.py --name motor --num_trajectories 1000 --num_val_trajectories 1000 --lr 1e-3 --epochs 50 --repeat 1 --J none  --R none  --G none --grad_H none --output-weight .25 --run_name motor_baseline_1000 --experiment scaling --baseline
-
-# sigmoid
-python main.py --name motor --num_trajectories 1 --num_val_trajectories 1000 --lr 1e-3 --epochs 10000 --repeat 50 --J sigmoid  --R sigmoid  --G mlp --output-weight .25 --run_name motor_sigmoid_1 --experiment scaling
-python main.py --name motor --num_trajectories 3 --num_val_trajectories 1000 --lr 1e-3 --epochs 3000 --repeat 20 --J sigmoid  --R sigmoid  --G mlp --output-weight .25 --run_name motor_sigmoid_3 --experiment scaling
-python main.py --name motor --num_trajectories 10 --num_val_trajectories 1000 --lr 1e-3 --epochs 1000 --repeat 10 --J sigmoid  --R sigmoid  --G mlp --output-weight .25 --run_name motor_sigmoid_10 --experiment scaling
-python main.py --name motor --num_trajectories 30 --num_val_trajectories 1000 --lr 1e-3 --epochs 500 --repeat 5 --J sigmoid  --R sigmoid  --G mlp --output-weight .25 --run_name motor_sigmoid_30 --experiment scaling
-python main.py --name motor --num_trajectories 100 --num_val_trajectories 1000 --lr 1e-3 --epochs 250 --repeat 1 --J sigmoid  --R sigmoid  --G mlp --output-weight .25 --run_name motor_sigmoid_100 --experiment scaling
-python main.py --name motor --num_trajectories 300 --num_val_trajectories 1000 --lr 1e-3 --epochs 100 --repeat 1 --J sigmoid  --R sigmoid  --G mlp --output-weight .25 --run_name motor_sigmoid_300 --experiment scaling
-python main.py --name motor --num_trajectories 1000 --num_val_trajectories 1000 --lr 1e-3 --epochs 50 --repeat 1 --J sigmoid  --R sigmoid  --G mlp --output-weight .25 --run_name motor_sigmoid_1000 --experiment scaling
 
 # matmul
 python main.py --name motor --num_trajectories 1 --num_val_trajectories 1000 --lr 1e-3 --epochs 10000 --repeat 50 --J matmul  --R matmul  --G mlp --output-weight .25 --run_name motor_matmul_1 --experiment scaling
