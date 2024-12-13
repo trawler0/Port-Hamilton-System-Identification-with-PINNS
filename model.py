@@ -31,22 +31,6 @@ class VTU(nn.Module):
         return M
 
 
-def functional_calculus(A: torch.Tensor, func) -> torch.Tensor:
-    if A.shape[-1] != A.shape[-2]:
-        raise ValueError("The last two dimensions of A must be equal (square matrices).")
-
-    if not torch.allclose(A, A.transpose(-1, -2), atol=1e-6):
-        raise ValueError("Input matrix A must be symmetric.")
-
-    eigenvalues, eigenvectors = torch.linalg.eigh(A)
-
-    f_eigenvalues = func(eigenvalues)
-
-    f_eigenvalues_diag = torch.diag_embed(f_eigenvalues)
-    transformed_A = torch.matmul(eigenvectors, torch.matmul(f_eigenvalues_diag, eigenvectors.transpose(-1, -2)))
-
-    return transformed_A
-
 
 class MLP(nn.Sequential):
 
@@ -88,125 +72,6 @@ class Baseline(nn.Module):
         out = self.mlp(xu)
         return out[:, :-u_dim], out[:, -u_dim:]
 
-
-class ModelOld(nn.Module):
-
-    def __init__(self, input_dim, hidden_dim):
-        super(ModelOld, self).__init__()
-        self.input_dim = input_dim
-        self.J1 = nn.Parameter(torch.randn(input_dim, input_dim + hidden_dim).T)
-        self.J2 = nn.Parameter(torch.randn(input_dim + hidden_dim, input_dim).T)
-        self.J_sigma = nn.Linear(input_dim, hidden_dim)
-
-        self.R1 = nn.Parameter(torch.randn(input_dim, input_dim + hidden_dim).T)
-        self.R_sigma = nn.Linear(input_dim, hidden_dim)
-
-        self.H = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),
-            nn.SiLU(inplace=True),
-            nn.Linear(hidden_dim, 1)
-        )
-
-        self.G = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),
-            nn.SiLU(inplace=True),
-            nn.Linear(hidden_dim, input_dim)
-        )
-
-        nn.init.kaiming_normal_(self.J1)
-        nn.init.kaiming_normal_(self.J2)
-        nn.init.kaiming_normal_(self.R1)
-
-    def _R(self, x, grad_H):
-        sigma = torch.sigmoid(self.R_sigma(x))
-        sigma = torch.cat([sigma, torch.ones(sigma.size(0), self.input_dim, device=sigma.device)], dim=-1)
-        x = F.linear(F.linear(grad_H, self.R1) * sigma, self.R1.T)
-        return x
-
-    def _J(self, x, grad_H):
-        sigma = torch.sigmoid(self.J_sigma(x))
-        sigma = torch.cat([sigma, torch.ones(sigma.size(0), self.input_dim, device=sigma.device)], dim=-1)
-        J_left = F.linear((F.linear(grad_H, self.J1) * sigma), self.J2)
-        J_right = F.linear((F.linear(grad_H, self.J2.T) * sigma), self.J1.T)
-        return J_left - J_right
-
-    def grad_H(self, x):
-        return torch.autograd.grad(
-            inputs=x,
-            outputs=self.H(x),
-            grad_outputs=torch.ones_like(self.H(x)),
-            create_graph=True,
-            retain_graph=True,
-        )[0]
-
-    def forward(self, x, u):
-        x.requires_grad = True
-        grad_H = self.grad_H(x)
-        J_R = self._J(x, grad_H) - self._R(x, grad_H)
-        G = self.G(x)
-
-        return J_R + G * u
-
-
-class J_Sigmoid(nn.Module):
-
-    def __init__(self, input_dim, hidden_dim, depth, excitation="linear"):
-        super().__init__()
-        self.input_dim = input_dim
-        self.J1 = nn.Parameter(torch.randn(input_dim, input_dim + hidden_dim).T)
-        self.J2 = nn.Parameter(torch.randn(input_dim + hidden_dim, input_dim).T)
-        if excitation == "linear":
-            self.J_sigma = nn.Linear(input_dim, hidden_dim)
-        elif excitation == "mlp":
-            self.J_sigma = MLP(input_dim, hidden_dim, hidden_dim, depth=depth)
-
-        nn.init.kaiming_normal_(self.J1)
-        nn.init.kaiming_normal_(self.J2)
-
-    def forward(self, x, grad_H):
-        sigma = torch.sigmoid(self.J_sigma(x))
-        sigma = torch.cat([sigma, torch.ones(sigma.size(0), self.input_dim, device=sigma.device)], dim=-1)
-        J_left = F.linear((F.linear(grad_H, self.J1) * sigma), self.J2)
-        J_right = F.linear((F.linear(grad_H, self.J2.T) * sigma), self.J1.T)
-        return J_left - J_right
-
-    def reparam(self, x):
-        sigma = torch.sigmoid(self.J_sigma(x))
-        sigma = torch.cat([sigma, torch.ones(sigma.size(0), self.input_dim, device=sigma.device)], dim=-1)  # B x hidden
-        sigma = torch.diag_embed(sigma)  # B x hidden x hidden
-        J1 = self.J1.T.unsqueeze(0).expand(x.size(0), -1, -1)  # B x input x hidden
-        J2 = self.J2.T.unsqueeze(0).expand(x.size(0), -1, -1)
-        J_left = J1 @ sigma @ J2  # B x input x input
-        J_right = J2.permute(0, 2, 1) @ sigma @ J1.permute(0, 2, 1)  # B x input x input
-        return J_left - J_right
-
-
-class R_Sigmoid(nn.Module):
-
-    def __init__(self, input_dim, hidden_dim, depth, excitation="linear"):
-        super().__init__()
-        self.input_dim = input_dim
-        self.R_ = nn.Parameter(torch.randn(input_dim, input_dim + hidden_dim).T)
-        if excitation == "linear":
-            self.R_sigma = nn.Linear(input_dim, hidden_dim)
-        elif excitation == "mlp":
-            self.R_sigma = MLP(input_dim, hidden_dim, hidden_dim, depth=depth)
-
-        nn.init.kaiming_normal_(self.R_)
-
-    def forward(self, x, grad_H):
-        sigma = torch.sigmoid(self.R_sigma(x))
-        sigma = torch.cat([sigma, torch.ones(sigma.size(0), self.input_dim, device=sigma.device)], dim=-1)
-        x = F.linear(F.linear(grad_H, self.R_) * sigma, self.R_.T)
-        return x
-
-    def reparam(self, x):
-        sigma = torch.sigmoid(self.R_sigma(x))
-        sigma = torch.cat([sigma, torch.ones(sigma.size(0), self.input_dim, device=sigma.device)], dim=-1)
-        sigma = torch.diag_embed(sigma)
-        R_ = self.R_.T.unsqueeze(0).expand(x.size(0), -1, -1)
-        R = R_ @ sigma @ R_.permute(0, 2, 1)
-        return R
 
 
 class JLinear(nn.Module):
@@ -375,9 +240,7 @@ class PHNNModel(nn.Module):
     def __init__(self, input_dim, hidden_dim, depth, J="sigmoid", R="sigmoid", grad_H="gradient", G="mlp", excitation="linear",
                  u_dim=1):
         super().__init__()
-        if J == "sigmoid":
-            self.J = J_Sigmoid(input_dim, hidden_dim, depth, excitation)
-        elif J == "linear":
+        if J == "linear":
             self.J = JLinear(input_dim)
         elif J == "matmul":
             self.J = JMatmul(input_dim, hidden_dim, depth)
@@ -386,9 +249,7 @@ class PHNNModel(nn.Module):
         else:
             raise ValueError("Unknown J")
 
-        if R == "sigmoid":
-            self.R = R_Sigmoid(input_dim, hidden_dim, depth, excitation)
-        elif R == "linear":
+        if R == "linear":
             self.R = RLinear(input_dim)
         elif R == "matmul":
             self.R = RMatmul(input_dim, hidden_dim, depth)
