@@ -87,7 +87,7 @@ class JLinear(nn.Module):
         return F.linear(grad_H, J)
 
     def reparam(self, x):
-        J = (self.J_ - self.J_.T).T
+        J = (self.J_ - self.J_.T)
         return J.unsqueeze(0).expand(x.size(0), -1, -1)
 
 
@@ -160,7 +160,7 @@ class JMatmul(nn.Module):
     def reparam(self, x):
         J_ = self.vsu(self.J_(x))
         J = J_ - J_.permute(0, 2, 1)
-        return J.transpose(1, 2)
+        return J
 
 
 class RMatmul(nn.Module):
@@ -227,7 +227,7 @@ class RQuadratic(nn.Module):
         x = torch.cat([x, torch.ones((B, 1), device=x.device)], dim=1)
         x = (x @ self.weight).view(-1, D, D)
         R = x @ x.transpose(1, 2) / math.sqrt(D)
-        return (grad_H.unsqueeze(1) @ R.T).squeeze(1)
+        return (grad_H.unsqueeze(1) @ R).squeeze(1)
 
     def reparam(self, x):
         B, D = x.size()
@@ -321,10 +321,6 @@ class PHNNModel(nn.Module):
 
 if __name__ == "__main__":
     model = PHNNModel(4, 64, 3, J="spring", R="quadratic", grad_H="gradient", G="linear", excitation="mlp", u_dim=2)
-    x = torch.randn(10, 4)
-    u = torch.randn(10, 2)
-    print(model.reparam(x))
-
-    x = torch.randn(2, 4)
-    w = torch.randn(4, 4)
-    print(x @ w.T, F.linear(x, w))
+    x = torch.randn(256, 4)
+    u = torch.randn(256, 2)
+    print(model(x, u))

@@ -35,14 +35,14 @@ def noise_plots():
     t = np.arange(1000) * 0.01
     for j in range(n):
         for dB, X_pred in X:
-            ax[j].plot(t, X_pred[0, :1000, j], label=f"dB={dB}")
-        ax[j].plot(t, X_true[0, :1000, j], label="True", color="black")
+            ax[j].plot(t, X_pred[6, :1000, j], label=f"dB={dB}")
+        ax[j].plot(t, X_true[6, :1000, j], label="True", color="black")
         ax[j].set_xlabel("Time [s]")
         ax[j].set_ylabel("Trajectory")
         ax[j].grid()
         ax[j].set_title(f"Trajectory {j}")
         ax[j].legend()
-    #plt.show()
+    plt.show()
 
     plt.savefig(os.path.join("results", "noise.png"))
 

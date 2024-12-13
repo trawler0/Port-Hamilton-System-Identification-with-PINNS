@@ -1,2 +1,2 @@
-python main.py --name spring --num_trajectories 1000 --num_val_trajectories 1000 --lr 1e-3 --epochs 50 --repeat 1 --J linear  --R matmul  --G linear --output-weight .25 --run_name ball_prior_1000 --experiment prior_vs_default --weight_decay 1e-3
-python main.py --name spring --num_trajectories 1000 --num_val_trajectories 1000 --lr 1e-3 --epochs 50 --repeat 1 --J matmul  --R matmul  --G mlp --output-weight .25 --run_name ball_matmul_1000 --experiment prior_vs_default
+python main.py --name spring --num_trajectories 1000 --num_val_trajectories 1000 --lr 1e-3 --epochs 50 --repeat 1 --J linear  --R matmul  --G linear --grad_H linear --output-weight .25 --run_name prior --experiment prior_vs_default --weight_decay 1e-3
+python main.py --name spring --num_trajectories 1000 --num_val_trajectories 1000 --lr 1e-3 --epochs 50 --repeat 1 --J matmul  --R matmul  --G mlp --output-weight .25 --run_name default --experiment prior_vs_default
