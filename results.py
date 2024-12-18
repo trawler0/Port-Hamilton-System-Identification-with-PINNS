@@ -3,7 +3,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 import os
 
-plt.style.use('seaborn-darkgrid')  # You can choose other styles like 'ggplot', 'classic', etc.
+#plt.style.use('seaborn-darkgrid')  # You can choose other styles like 'ggplot', 'classic', etc.
 
 if not os.path.exists("results"):
     os.makedirs("results")
@@ -187,7 +187,7 @@ def compare():
 
 
 
-noise_plots()
+#noise_plots()
 plot_scaling()
 recipe()
 compare()

@@ -9,6 +9,7 @@ import numpy as np
 from data import dim_bias_scale_sigs
 import mlflow
 import argparse
+import random
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--name", type=str, default="ball")
@@ -41,8 +42,7 @@ parser.add_argument("--tag", type=str, default=None)
 parser.add_argument("--dB", type=float, default=None)
 parser.add_argument("--baseline", action="store_true", default=False)
 parser.add_argument("--experiment", type=str, default="0")
-parser.add_argument("--num_avg", type=int, default=1)
-
+parser.add_argument("--num_avg", type=int, default=3)
 
 args = parser.parse_args()
 try:
@@ -53,6 +53,16 @@ try:
         experiment_id = mlflow.create_experiment(args.experiment)
 except Exception as e:
     print(f"Error fetching or creating experiment: {e}")
+
+
+def set_seed(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+
+
+set_seed(args.seed)
+torch.use_deterministic_algorithms(True)
 
 with mlflow.start_run(run_name=args.run_name, experiment_id=experiment_id):
     mlflow.set_tag("name", args.name)
@@ -95,9 +105,14 @@ with mlflow.start_run(run_name=args.run_name, experiment_id=experiment_id):
         a = None
         b = None
 
-    X, u, xdot, y = np.concatenate([X] * args.repeat), np.concatenate([u] * args.repeat), np.concatenate([xdot] * args.repeat), np.concatenate([y] * args.repeat)
-    X, u, xdot, y = torch.tensor(X, dtype=torch.float32), torch.tensor(u, dtype=torch.float32), torch.tensor(xdot, dtype=torch.float32), torch.tensor(y, dtype=torch.float32)
-    X_val, u_val, xdot_val, y_val = torch.tensor(X_val, dtype=torch.float32), torch.tensor(u_val, dtype=torch.float32), torch.tensor(xdot_val, dtype=torch.float32), torch.tensor(y_val, dtype=torch.float32)
+    X, u, xdot, y = np.concatenate([X] * args.repeat), np.concatenate([u] * args.repeat), np.concatenate(
+        [xdot] * args.repeat), np.concatenate([y] * args.repeat)
+    X, u, xdot, y = torch.tensor(X, dtype=torch.float32), torch.tensor(u, dtype=torch.float32), torch.tensor(xdot,
+                                                                                                             dtype=torch.float32), torch.tensor(
+        y, dtype=torch.float32)
+    X_val, u_val, xdot_val, y_val = torch.tensor(X_val, dtype=torch.float32), torch.tensor(u_val,
+                                                                                           dtype=torch.float32), torch.tensor(
+        xdot_val, dtype=torch.float32), torch.tensor(y_val, dtype=torch.float32)
 
     train_ds = Dataset(X, u, xdot, y)
     val_ds = Dataset(X_val, u_val, xdot_val, y_val)
