@@ -136,7 +136,7 @@ class Grad_HLinear(nn.Module):
         return (F.linear(x, Q) @ x.unsqueeze(-1)).squeeze(-1)
 
 
-class JMatmul(nn.Module):
+class JDefault(nn.Module):
 
     def __init__(
             self,
@@ -163,7 +163,7 @@ class JMatmul(nn.Module):
         return J
 
 
-class RMatmul(nn.Module):
+class RDefault(nn.Module):
 
     def __init__(
             self,
@@ -257,10 +257,10 @@ class PHNNModel(nn.Module):
         super().__init__()
         if J == "linear":
             self.J = JLinear(input_dim)
-        elif J == "matmul":
-            self.J = JMatmul(input_dim, hidden_dim, depth)
-        elif J == "matmul_kan":
-            self.J = JMatmul(input_dim, hidden_dim, depth, arch="kan")
+        elif J == "default":
+            self.J = JDefault(input_dim, hidden_dim, depth)
+        elif J == "default_kan":
+            self.J = JDefault(input_dim, hidden_dim, depth, arch="kan")
         elif J == "spring":
             self.J = JSpring()
         else:
@@ -270,10 +270,10 @@ class PHNNModel(nn.Module):
             self.R = RLinear(input_dim)
         elif R == "quadratic":
             self.R = RQuadratic(input_dim)
-        elif R == "matmul":
-            self.R = RMatmul(input_dim, hidden_dim, depth)
-        elif R == "matmul_kan":
-            self.R = RMatmul(input_dim, hidden_dim, depth, arch="kan")
+        elif R == "default":
+            self.R = RDefault(input_dim, hidden_dim, depth)
+        elif R == "default_kan":
+            self.R = RDefault(input_dim, hidden_dim, depth, arch="kan")
         else:
             raise ValueError("Unknown R")
 

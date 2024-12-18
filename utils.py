@@ -37,7 +37,7 @@ def multi_sin_signal(n_signals=1, amplitude=.2, seed=None):
 
 
 @torch.no_grad()
-def forecast(model, X0, u, dt, signal, steps, clamp=10., a=None, b=None):
+def forecast(model, X0, u, dt, signal, steps, clamp=100., a=None, b=None):
     model.eval()
     X = torch.zeros(X0.shape[0], steps, X0.shape[-1])
     u = torch.tensor(u)

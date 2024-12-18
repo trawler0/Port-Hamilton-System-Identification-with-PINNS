@@ -17,8 +17,8 @@ parser.add_argument("--num_trajectories", type=int, default=100)
 parser.add_argument("--num_val_trajectories", type=int, default=1000)
 parser.add_argument("--hidden_dim", type=int, default=64)
 parser.add_argument("--depth", type=int, default=3)
-parser.add_argument("--J", type=str, default="matmul")
-parser.add_argument("--R", type=str, default="matmul")
+parser.add_argument("--J", type=str, default="default")
+parser.add_argument("--R", type=str, default="default")
 parser.add_argument("--G", type=str, default="mlp")
 parser.add_argument("--output-weight", type=float, default=.25)
 parser.add_argument("--excitation", type=str, default="mlp")
@@ -117,11 +117,13 @@ with mlflow.start_run(run_name=args.run_name, experiment_id=experiment_id):
     train_ds = Dataset(X, u, xdot, y)
     val_ds = Dataset(X_val, u_val, xdot_val, y_val)
 
-    train_loader = torch.utils.data.DataLoader(train_ds, batch_size=args.batch_size, shuffle=True)
-    val_loader = torch.utils.data.DataLoader(val_ds, batch_size=len(val_ds), shuffle=False)
-
     models = []
-    for _ in range(args.num_avg):
+    for i in range(args.num_avg):
+        set_seed(args.seed + i)
+
+        train_loader = torch.utils.data.DataLoader(train_ds, batch_size=args.batch_size, shuffle=True)
+        val_loader = torch.utils.data.DataLoader(val_ds, batch_size=len(val_ds), shuffle=False)
+
         if args.baseline:
             model = Baseline(DIM, 2 * args.hidden_dim, sigs, args.depth)
         else:
