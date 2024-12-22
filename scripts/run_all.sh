@@ -5,5 +5,5 @@ bash scripts/prior_vs_default.sh  # spring
 bash scripts/prior_comparison.sh  # spring
 bash scripts/recipe.sh  # spring
 bash scripts/scaling.sh  # motor
-bash scripts/scale_kan.sh
+bash scripts/kan.sh
 
