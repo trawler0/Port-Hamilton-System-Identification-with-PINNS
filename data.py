@@ -214,7 +214,7 @@ def simple_experiment(name, simulation_time, num_steps, **kwargs):
         spring_constants = kwargs.pop("spring_constants", (1., .1))
         damping = kwargs.pop("damping", 2.)
         if mlflow.active_run():
-            mlflow.log_params({"masses": masses, "spring_constants": spring_constants, "damping": damping, "G": G})
+            mlflow.log_params({"data_masses": masses, "data_spring_constants": spring_constants, "data_damping": damping, "data_G": G})
         get_u = partial(multi_sin_signal, n_signals=2, amplitude=kwargs.pop("amplitude", .5))
         return CoupledSpringMassDamper(G, masses, spring_constants, damping, simulation_time, num_steps, get_u)
     elif name == "ball":
@@ -223,7 +223,7 @@ def simple_experiment(name, simulation_time, num_steps, **kwargs):
         c = kwargs.pop("c", 1.)  # Hannes: 0.1, Achraf: 1.
         G = kwargs.pop("G", np.array([[0], [0], [1]]))
         if mlflow.active_run():
-            mlflow.log_params({"m": m, "R": R, "c": c, "G": G})
+            mlflow.log_params({"data_m": m, "data_R": R, "data_c": c, "data_G": G})
         get_u = partial(multi_sin_signal, amplitude=kwargs.pop("amplitude", .5))
         return MagneticBall(m, R, c, G, simulation_time, num_steps, get_u)
     elif name == "motor":
@@ -234,7 +234,7 @@ def simple_experiment(name, simulation_time, num_steps, **kwargs):
         Phi = kwargs.pop("Phi", 0.17)
         G = kwargs.pop("G", np.array([[1, 0], [0, 1], [0, 0]]))
         if mlflow.active_run():
-            mlflow.log_params({"J_m": J_m, "L": L, "beta": beta, "r": r, "Phi": Phi})
+            mlflow.log_params({"data_J_m": J_m, "data_L": L, "data_beta": beta, "data_r": r, "data_Phi": Phi})
         get_u = partial(multi_sin_signal, n_signals=2, amplitude=kwargs.pop("amplitude", .5))
         return PMSM(J_m, L, beta, r, Phi, G, simulation_time, num_steps, get_u)
     else:
