@@ -149,15 +149,6 @@ with mlflow.start_run(run_name=args.run_name, experiment_id=experiment_id):
 
     generator_val = simple_experiment(name, time, steps)
     _, _, _, _, trajectories_val = generator_val.get_data(X0_val[:forecast_examples])
-    if args.dB is not None:
-        traj_val = []
-        for x, u, y, signal in trajectories_val:
-            u = u + get_uniform_white_noise(u, a)
-            y = y + get_uniform_white_noise(y, b)
-            traj_val.append((x, u, y, signal))
-        trajectories_val = traj_val
-    visualize_trajectory(model, forecast_examples, steps, dt, trajectories_val, a=a, b=b)
-
     if not args.baseline:
         X = np.concatenate([xu[0] for xu in trajectories_val])
         G_true = np.stack([generator_val.G(x) for x in X])
