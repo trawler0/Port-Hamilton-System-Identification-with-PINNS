@@ -4,7 +4,7 @@ import torch
 from utils import sample_initial_states, multi_sin_signal, get_uniform_white_noise, get_noise_bound
 from functools import partial
 from tqdm import tqdm
-
+import mlflow
 
 class BaseDataGenerator:
 
@@ -213,6 +213,8 @@ def simple_experiment(name, simulation_time, num_steps, **kwargs):
         masses = kwargs.pop("masses", (1., 1.5))
         spring_constants = kwargs.pop("spring_constants", (1., .1))
         damping = kwargs.pop("damping", 2.)
+        if mlflow.active_run():
+            mlflow.log_params({"masses": masses, "spring_constants": spring_constants, "damping": damping, "G": G})
         get_u = partial(multi_sin_signal, n_signals=2, amplitude=kwargs.pop("amplitude", .5))
         return CoupledSpringMassDamper(G, masses, spring_constants, damping, simulation_time, num_steps, get_u)
     elif name == "ball":
@@ -220,15 +222,19 @@ def simple_experiment(name, simulation_time, num_steps, **kwargs):
         R = kwargs.pop("R", .1)  # Hannes: 0.1, Achraf: 0.1
         c = kwargs.pop("c", 1.)  # Hannes: 0.1, Achraf: 1.
         G = kwargs.pop("G", np.array([[0], [0], [1]]))
+        if mlflow.active_run():
+            mlflow.log_params({"m": m, "R": R, "c": c, "G": G})
         get_u = partial(multi_sin_signal, amplitude=kwargs.pop("amplitude", .5))
         return MagneticBall(m, R, c, G, simulation_time, num_steps, get_u)
     elif name == "motor":
-        J_m = kwargs.pop("J_m", 1)
-        L = kwargs.pop("L", 1)
-        beta = kwargs.pop("beta", 1)
-        r = kwargs.pop("r", 1)
-        Phi = kwargs.pop("Phi", 1)
+        J_m = kwargs.pop("J_m", 0.012)
+        L = kwargs.pop("L", 0.0038)
+        beta = kwargs.pop("beta", 0.0026)
+        r = kwargs.pop("r", 0.225)
+        Phi = kwargs.pop("Phi", 0.17)
         G = kwargs.pop("G", np.array([[1, 0], [0, 1], [0, 0]]))
+        if mlflow.active_run():
+            mlflow.log_params({"J_m": J_m, "L": L, "beta": beta, "r": r, "Phi": Phi})
         get_u = partial(multi_sin_signal, n_signals=2, amplitude=kwargs.pop("amplitude", .5))
         return PMSM(J_m, L, beta, r, Phi, G, simulation_time, num_steps, get_u)
     else:
