@@ -27,10 +27,10 @@ def sample_initial_states(num_trajectories, dim, strategy):
 def multi_sin_signal(n_signals=1, amplitude=.2, seed=None):
     if seed is not None:
         np.random.seed(seed)
-    i = np.arange(40)
-    i, phi = np.stack([i] * n_signals), np.random.uniform(0, 2 * np.pi, (n_signals, 40))
+    i = np.arange(5)
+    i, phi = np.stack([i] * n_signals), np.random.uniform(0, 2 * np.pi, (n_signals, 5))
     def u(t):
-        sins = np.sin(2 * np.pi * i * .1 * t + phi)
+        sins = np.sin(2 * np.pi * i * .1 * t / 10 + phi)
         out = np.sum(sins, axis=-1) * amplitude
         return out
     return u

@@ -1,0 +1,2 @@
+python main.py --name motor --num_trajectories 3 --num_val_trajectories 1000 --lr 1e-3 --epochs 3000 --repeat 5 --J default  --R default  --G mlp --output-weight .25 --run_name default --experiment motor_comparison
+python main.py --name motor --num_trajectories 3 --num_val_trajectories 1000 --lr 1e-3 --epochs 3000 --repeat 5 --J none  --R none  --G none --grad_H none --output-weight .25 --run_name baseline --experiment motor_comparison --baseline

@@ -250,9 +250,76 @@ class JSpring(nn.Module):
     def reparam(self, x):
         return self.J
 
+class J_Sigmoid(nn.Module):
+
+    def __init__(self, input_dim, hidden_dim, excitation="linear"):
+        super().__init__()
+        self.input_dim = input_dim
+        self.J1 = nn.Parameter(torch.randn(input_dim, input_dim + hidden_dim).T)
+        self.J2 = nn.Parameter(torch.randn(input_dim + hidden_dim, input_dim).T)
+        if excitation == "linear":
+            self.J_sigma = nn.Linear(input_dim, hidden_dim)
+        elif excitation == "mlp":
+            self.J_sigma = nn.Sequential(
+                nn.Linear(input_dim, hidden_dim),
+                nn.SiLU(inplace=True),
+                nn.Linear(hidden_dim, hidden_dim)
+            )
+
+        nn.init.kaiming_normal_(self.J1)
+        nn.init.kaiming_normal_(self.J2)
+
+    def forward(self, x, grad_H):
+        sigma = torch.sigmoid(self.J_sigma(x))
+        sigma = torch.cat([sigma, torch.ones(sigma.size(0), self.input_dim, device=sigma.device)], dim=-1)
+        J_left = F.linear((F.linear(grad_H, self.J1) * sigma), self.J2)
+        J_right = F.linear((F.linear(grad_H, self.J2.T) * sigma), self.J1.T)
+        return J_left - J_right
+
+    def reparam(self, x):
+        sigma = torch.sigmoid(self.J_sigma(x))
+        sigma = torch.cat([sigma, torch.ones(sigma.size(0), self.input_dim, device=sigma.device)], dim=-1)  # B x hidden
+        sigma = torch.diag_embed(sigma)  # B x hidden x hidden
+        J1 = self.J1.T.unsqueeze(0).expand(x.size(0), -1, -1)  # B x input x hidden
+        J2 = self.J2.T.unsqueeze(0).expand(x.size(0), -1, -1)
+        J_left = J1 @ sigma @ J2  # B x input x input
+        J_right = J2.permute(0, 2, 1) @ sigma @ J1.permute(0, 2, 1)  # B x input x input
+        return J_left - J_right
+
+class R_Sigmoid(nn.Module):
+
+    def __init__(self, input_dim, hidden_dim, excitation="linear"):
+        super().__init__()
+        self.input_dim = input_dim
+        self.R_ = nn.Parameter(torch.randn(input_dim, input_dim + hidden_dim).T)
+        if excitation == "linear":
+            self.R_sigma = nn.Linear(input_dim, hidden_dim)
+        elif excitation == "mlp":
+            self.R_sigma = nn.Sequential(
+                nn.Linear(input_dim, hidden_dim),
+                nn.SiLU(inplace=True),
+                nn.Linear(hidden_dim, hidden_dim)
+            )
+
+        nn.init.kaiming_normal_(self.R_)
+
+    def forward(self, x, grad_H):
+        sigma = torch.sigmoid(self.R_sigma(x))
+        sigma = torch.cat([sigma, torch.ones(sigma.size(0), self.input_dim, device=sigma.device)], dim=-1)
+        x = F.linear(F.linear(grad_H, self.R_) * sigma, self.R_.T)
+        return x
+
+    def reparam(self, x):
+        sigma = torch.sigmoid(self.R_sigma(x))
+        sigma = torch.cat([sigma, torch.ones(sigma.size(0), self.input_dim, device=sigma.device)], dim=-1)
+        sigma = torch.diag_embed(sigma)
+        R_ = self.R_.T.unsqueeze(0).expand(x.size(0), -1, -1)
+        R = R_ @ sigma @ R_.permute(0, 2, 1)
+        return R
+
 class PHNNModel(nn.Module):
 
-    def __init__(self, input_dim, hidden_dim, depth, J="default", R="default", grad_H="gradient", G="mlp", excitation="linear",
+    def __init__(self, input_dim, hidden_dim, depth, J="default", R="default", grad_H="gradient", G="mlp", excitation="mlp",
                  u_dim=1):
         super().__init__()
         if J == "linear":
@@ -261,6 +328,8 @@ class PHNNModel(nn.Module):
             self.J = JDefault(input_dim, hidden_dim, depth)
         elif J == "default_kan":
             self.J = JDefault(input_dim, hidden_dim, depth, arch="kan")
+        elif J == "sigmoid":
+            self.J = J_Sigmoid(input_dim, hidden_dim, excitation)
         elif J == "spring":
             self.J = JSpring()
         else:
@@ -272,6 +341,8 @@ class PHNNModel(nn.Module):
             self.R = RQuadratic(input_dim)
         elif R == "default":
             self.R = RDefault(input_dim, hidden_dim, depth)
+        elif R == "sigmoid":
+            self.R = R_Sigmoid(input_dim, hidden_dim, excitation)
         elif R == "default_kan":
             self.R = RDefault(input_dim, hidden_dim, depth, arch="kan")
         else:
@@ -320,7 +391,7 @@ class PHNNModel(nn.Module):
 
 
 if __name__ == "__main__":
-    model = PHNNModel(4, 64, 3, J="spring", R="quadratic", grad_H="gradient", G="linear", excitation="mlp", u_dim=2)
+    model = PHNNModel(4, 10, 3, J="default_kan", R="default_kan", grad_H="gradient_kan", G="kan", excitation="mlp", u_dim=2)
     x = torch.randn(256, 4)
     u = torch.randn(256, 2)
-    print(model(x, u))
+    print(sum(p.numel() for p in model.parameters()))

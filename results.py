@@ -17,11 +17,16 @@ colors = {
     "baseline": "blue",
     "default": "red",
     "prior": "green",
-    "shallow": "orange",
+    "shallow": "gray",
     "shorter": "purple",
     "wrong": "turquoise",
     "generic": "magenta",
     "quadratic": "black",
+    "noise50": "blue",
+    "noise40": "red",
+    "noise30": "green",
+    "noise20": "purple",
+    "no_noise": "black",
 }
 line_styles = {
     "True": "-",
@@ -40,44 +45,6 @@ thickness = {
     "shorter": 1.5,
 }
 
-def noise_plots():
-    experiment = mlflow.get_experiment_by_name("noise")
-    runs = mlflow.search_runs(experiment.experiment_id)
-    X = []
-    for i, run in runs.iterrows():
-        run_id = run["run_id"]
-        run = mlflow.get_run(run_id)
-        params = run.data.params
-
-        dB = params["dB"]
-
-        # Download artifact
-        artifacts_path = mlflow.artifacts.download_artifacts(run_id=run_id)
-
-        # Example: If artifact is a file, handle it
-        for root, _, files in os.walk(artifacts_path):
-            for file in files:
-                artifact_file_path = os.path.join(root, file)
-                if artifact_file_path.endswith("X_pred.npy"):
-                    X_pred = np.load(artifact_file_path)
-                    X_true = np.load(artifact_file_path.replace("X_pred", "X"))
-                    X.append((dB, X_pred))
-    n = X_pred.shape[-1]
-    fig, ax = plt.subplots(n, 1, figsize=(30, 30))
-    t = np.arange(1000) * 0.01
-    for j in range(n):
-        for dB, X_pred in X:
-            ax[j].plot(t, X_pred[6, :1000, j], label=f"dB={dB}")
-        ax[j].plot(t, X_true[6, :1000, j], label="True", color="black")
-        ax[j].set_xlabel("Time [s]")
-        ax[j].set_ylabel("Trajectory")
-        ax[j].grid()
-        ax[j].set_title(f"Trajectory {j}")
-        ax[j].legend(fontsize=32)
-    plt.show()
-
-    plt.savefig(os.path.join("results", "noise.png"))
-
 
 def plot_scaling():
     experiment = mlflow.get_experiment_by_name("scaling")
@@ -93,8 +60,8 @@ def plot_scaling():
             params = run.data.params
             metrics = run.data.metrics
             run_name = params["run_name"]
-            mae_rel = metrics["mae"]
-            mse_rel = metrics["mse"]
+            mae_rel = metrics["mae_rel"]
+            mse_rel = metrics["mse_rel"]
             if run_name.startswith(f"{name}_baseline"):
                 baseline[int(params["num_trajectories"])] = [mae_rel, mse_rel]
             elif run_name.startswith(f"{name}_default"):
@@ -203,14 +170,14 @@ def compare():
                     X_true = np.load(artifact_file_path.replace("X_pred", "X"))
                     preds[run_name] = X_pred
 
-    idx = 14
-    state = 0
+    idx = 12
+    state = 1
     n = X_pred.shape[-1]
     fig, ax = plt.subplots(1, 1, figsize=(30, 15))
     ax.set_xlabel("Time [s]", fontsize=32)
     ax.set_ylabel("Momentum $x_2$", fontsize=32)
-    t = np.arange(5000) * 0.01
-    ax.plot(t, X_true[idx, :5000, state], label="True", color="black", linestyle="-", linewidth=thickness["True"])
+    t = np.arange(4000) * 0.01
+    ax.plot(t, X_true[idx, :4000, state], label="True", color="black", linestyle="-", linewidth=thickness["True"])
     for run_name, X_pred in preds.items():
         def rename(name):
             if name == "prior":
@@ -219,7 +186,7 @@ def compare():
                 return "pH"
             elif name == "baseline":
                 return "Baseline"
-        ax.plot(t, X_pred[idx, :5000, state], label=rename(run_name), color=colors[run_name], linestyle=line_styles[run_name], linewidth=thickness[run_name])
+        ax.plot(t, X_pred[idx, :4000, state], label=rename(run_name), color=colors[run_name], linestyle=line_styles[run_name], linewidth=thickness[run_name])
     ax.axvline(x=10., color='purple', linestyle='--', linewidth=2)
     ax.legend(fontsize=32)
     ax.grid()
@@ -314,8 +281,8 @@ def prior_comparison():
             metrics = run.data.metrics
             run_name = params["run_name"]
             print(run_name)
-            mae_rel = metrics["mae"]
-            mse_rel = metrics["mse"]
+            mae_rel = metrics["mae_rel"]
+            mse_rel = metrics["mse_rel"]
             if run_name.startswith(f"wrong"):
                 wrong[int(params["num_trajectories"])] = [mae_rel, mse_rel]
             elif run_name.startswith(f"R_generic"):
@@ -369,9 +336,65 @@ def prior_comparison():
 
         plt.savefig(os.path.join("results", f"{name}_prior_comparison.png"))
 
-#noise_plots()
-plot_scaling()
+
+
+def noise_plots():
+    experiment = mlflow.get_experiment_by_name("noise")
+    runs = mlflow.search_runs(experiment.experiment_id)
+    data = {
+        "no_noise": {},
+        "noise50": {},
+        "noise40": {},
+        "noise30": {},
+        "noise20": {}
+    }
+    for i, run in runs.iterrows():
+        run_id = run["run_id"]
+        run = mlflow.get_run(run_id)
+        params = run.data.params
+        run_name = params["run_name"]
+        name = params["name"]
+        mae = run.data.metrics["mae_rel"]
+        mse = run.data.metrics["mse_rel"]
+        data[run_name][int(params["num_trajectories"])] = mae
+    N = sorted
+
+    """fig, ax = plt.subplots(1, 1, figsize=(30, 30))
+    for name, mae in data.items():
+        ax.plot(mae, label="Baseline", marker='o', linestyle=":", color=colors["baseline"])
+
+    # Set log scales
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+
+    # Set title and labels with increased font sizes
+    ax.set_xlabel("Number of Trajectories Used for Training", fontsize=16)
+    ax.set_ylabel("Normalized MAE", fontsize=16)  # Added y-label for completeness
+
+    # Customize tick parameters for better readability
+    ax.tick_params(axis='both', which='major', labelsize=14)
+    ax.tick_params(axis='both', which='minor', labelsize=12)
+
+    # Enable and customize grid
+    ax.grid(True, which="both", ls="--", linewidth=0.5)
+
+    # Customize legend with larger font size and appropriate placement
+    ax.legend(fontsize=16, loc='best')  # 'best' lets matplotlib decide the optimal location
+
+    # Optional: Tight layout for better spacing
+    plt.tight_layout()
+    # plt.show()
+
+    plt.savefig(os.path.join("results", f"{name}_scaling.png"))"""
+
+
+
+
+
+
+noise_plots()
+"""plot_scaling()
 recipe()
-#compare()
+compare()
 prior_vs_default()
-prior_comparison()
+prior_comparison()"""

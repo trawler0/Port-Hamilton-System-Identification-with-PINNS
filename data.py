@@ -215,7 +215,7 @@ def simple_experiment(name, simulation_time, num_steps, **kwargs):
         damping = kwargs.pop("damping", 2.)
         if mlflow.active_run():
             mlflow.log_params({"data_masses": masses, "data_spring_constants": spring_constants, "data_damping": damping, "data_G": G})
-        get_u = partial(multi_sin_signal, n_signals=2, amplitude=kwargs.pop("amplitude", .5))
+        get_u = partial(multi_sin_signal, n_signals=2, amplitude=kwargs.pop("amplitude", .05))
         return CoupledSpringMassDamper(G, masses, spring_constants, damping, simulation_time, num_steps, get_u)
     elif name == "ball":
         m = kwargs.pop("m", 1.)  # Hannes: 0.012, Achraf: 1.
@@ -224,7 +224,7 @@ def simple_experiment(name, simulation_time, num_steps, **kwargs):
         G = kwargs.pop("G", np.array([[0], [0], [1]]))
         if mlflow.active_run():
             mlflow.log_params({"data_m": m, "data_R": R, "data_c": c, "data_G": G})
-        get_u = partial(multi_sin_signal, amplitude=kwargs.pop("amplitude", .5))
+        get_u = partial(multi_sin_signal, amplitude=kwargs.pop("amplitude", .4))
         return MagneticBall(m, R, c, G, simulation_time, num_steps, get_u)
     elif name == "motor":
         J_m = kwargs.pop("J_m", 0.012)
@@ -235,7 +235,7 @@ def simple_experiment(name, simulation_time, num_steps, **kwargs):
         G = kwargs.pop("G", np.array([[1, 0], [0, 1], [0, 0]]))
         if mlflow.active_run():
             mlflow.log_params({"data_J_m": J_m, "data_L": L, "data_beta": beta, "data_r": r, "data_Phi": Phi})
-        get_u = partial(multi_sin_signal, n_signals=2, amplitude=kwargs.pop("amplitude", .5))
+        get_u = partial(multi_sin_signal, n_signals=2, amplitude=kwargs.pop("amplitude", 50))
         return PMSM(J_m, L, beta, r, Phi, G, simulation_time, num_steps, get_u)
     else:
         raise NotImplementedError("Experiment not implemented")
@@ -244,17 +244,17 @@ def dim_bias_scale_sigs(name):
     if name == "spring":
         DIM = 4
         scale = np.array([1., 1., 1., 1.])
-        bias = np.array([0., 0., 0., 0.])
+        bias = np.array([-0.5, -0.5, -0.5, -0.5])
         sigs = 2
     elif name == "ball":
         DIM = 3
-        scale = np.array([[1.5, .4, 1.]])
-        bias = np.array([[-.75, -.2, .3]])
+        scale = np.array([[2.5, .4, 2.]])
+        bias = np.array([[-.5, -.2, -3.]])
         sigs = 1
     elif name == "motor":
         DIM = 3
-        scale = np.array([[1., 1., 1.]])
-        bias = np.array([[0., 0., 0.]])
+        scale = np.array([[2, 2, 10]])
+        bias = np.array([[-1, 1, -5]])
         sigs = 2
     else:
         raise ValueError("Unknown problem")
@@ -263,8 +263,9 @@ def dim_bias_scale_sigs(name):
 if __name__ == "__main__":
     from matplotlib import pyplot as plt
 
-    generator = simple_experiment("spring", 10, 1000)
-    X0 = sample_initial_states(20, 4, {"identifies": "uniform", "seed": 41})
+    generator = simple_experiment("ball", 100, 10000)
+    dim, scale, bias, sigs = dim_bias_scale_sigs("ball")
+    X0 = sample_initial_states(20, 3, {"identifies": "uniform", "seed": 41, "scale": scale, "bias": bias})
     X, u, xdot, y, trajectories = generator.get_data(X0)
     a = get_noise_bound(u, 5)
 
@@ -277,18 +278,18 @@ if __name__ == "__main__":
     print(std)
     print(np.mean(np.abs(xdot_hat - xdot) / std), np.mean(np.abs(xdot_hat - xdot)))
 
-    for j in range(1):
+    for j in range(0, 3):
         X, u, y, _ = trajectories[j]
+        print(X[0])
         dt = 1 / 100
         xdot = (X[1:] - X[:-1]) / dt
-        u += get_uniform_white_noise(u, a)
         X = X[:-1]
         u = u[:-1]
 
-        """for k in range(X.shape[-1]):
-            plt.plot(X[:, k], label=f"X_{k}")
-            plt.plot(xdot[:, k], label=f"xdot_{k}")"""
-        plt.plot(y[:, 0], label="y")
-        plt.plot(u, label="u")
+        fig, ax = plt.subplots(X.shape[-1] + 1, 1, figsize=(10, 10))
+        for i in range(X.shape[-1]):
+            ax[i].plot(X[:, i], label=f"X_{i}", color="red")
+            #ax[i].plot(xdot[:, i], label=f"Xdot_{i}", color="blue")
+        ax[-1].plot(u, label="u")
         plt.legend()
         plt.show()
