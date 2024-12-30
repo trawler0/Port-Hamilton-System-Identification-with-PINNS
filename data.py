@@ -96,7 +96,7 @@ class CoupledSpringMassDamper(BaseDataGenerator):
         return x.T @ self.M @ x
 
     def grad_H(self, x):
-        return self.M @ x  # error? should be 2Mx
+        return 2 * self.M @ x
 
     def J(self, x):
         return np.array([[0, 1, 0, 0],
@@ -207,7 +207,7 @@ class PMSM(BaseDataGenerator):
         return self.G_
 
 
-def simple_experiment(name, simulation_time, num_steps, **kwargs):
+def simple_experiment(name, simulation_time, num_steps, amplitude, f0, **kwargs):
     if name == "spring":
         G = np.array([[1, 0], [0, 0], [0, 1], [0, 0]])
         masses = kwargs.pop("masses", (1., 1.5))
@@ -215,16 +215,16 @@ def simple_experiment(name, simulation_time, num_steps, **kwargs):
         damping = kwargs.pop("damping", 2.)
         if mlflow.active_run():
             mlflow.log_params({"data_masses": masses, "data_spring_constants": spring_constants, "data_damping": damping, "data_G": G})
-        get_u = partial(multi_sin_signal, n_signals=2, amplitude=kwargs.pop("amplitude", .05))
+        get_u = partial(multi_sin_signal, n_signals=2, amplitude=amplitude, f_0=f0)
         return CoupledSpringMassDamper(G, masses, spring_constants, damping, simulation_time, num_steps, get_u)
     elif name == "ball":
-        m = kwargs.pop("m", 1.)  # Hannes: 0.012, Achraf: 1.
+        m = kwargs.pop("m", .1)  # Hannes: 0.012, Achraf: 1.
         R = kwargs.pop("R", .1)  # Hannes: 0.1, Achraf: 0.1
         c = kwargs.pop("c", 1.)  # Hannes: 0.1, Achraf: 1.
         G = kwargs.pop("G", np.array([[0], [0], [1]]))
         if mlflow.active_run():
             mlflow.log_params({"data_m": m, "data_R": R, "data_c": c, "data_G": G})
-        get_u = partial(multi_sin_signal, amplitude=kwargs.pop("amplitude", .4))
+        get_u = partial(multi_sin_signal, amplitude=amplitude, f_0=f0)
         return MagneticBall(m, R, c, G, simulation_time, num_steps, get_u)
     elif name == "motor":
         J_m = kwargs.pop("J_m", 0.012)
@@ -235,7 +235,7 @@ def simple_experiment(name, simulation_time, num_steps, **kwargs):
         G = kwargs.pop("G", np.array([[1, 0], [0, 1], [0, 0]]))
         if mlflow.active_run():
             mlflow.log_params({"data_J_m": J_m, "data_L": L, "data_beta": beta, "data_r": r, "data_Phi": Phi})
-        get_u = partial(multi_sin_signal, n_signals=2, amplitude=kwargs.pop("amplitude", 50))
+        get_u = partial(multi_sin_signal, n_signals=2, amplitude=amplitude, f_0=f0)
         return PMSM(J_m, L, beta, r, Phi, G, simulation_time, num_steps, get_u)
     else:
         raise NotImplementedError("Experiment not implemented")
@@ -246,25 +246,37 @@ def dim_bias_scale_sigs(name):
         scale = np.array([1., 1., 1., 1.])
         bias = np.array([-0.5, -0.5, -0.5, -0.5])
         sigs = 2
+        amplitude_train = 0.4
+        f0_train = .1
+        amplitude_val = 0.4
+        f0_val = .1
     elif name == "ball":
         DIM = 3
-        scale = np.array([[2.5, .4, 2.]])
+        scale = np.array([[2.5, .4, 7.]])
         bias = np.array([[-.5, -.2, -3.]])
         sigs = 1
+        amplitude_train = .3
+        f0_train = .1
+        amplitude_val = .3
+        f0_val = .1
     elif name == "motor":
         DIM = 3
-        scale = np.array([[2, 2, 10]])
-        bias = np.array([[-1, 1, -5]])
+        scale = np.array([[1, 1, 2]])
+        bias = np.array([[-.5, -.5, -1]])
         sigs = 2
+        amplitude_train = 5
+        f0_train = .1
+        amplitude_val = 5
+        f0_val = .1
     else:
         raise ValueError("Unknown problem")
-    return DIM, scale, bias, sigs
+    return DIM, scale, bias, sigs, amplitude_train, f0_train, amplitude_val, f0_val
 
 if __name__ == "__main__":
     from matplotlib import pyplot as plt
 
-    generator = simple_experiment("ball", 100, 10000)
-    dim, scale, bias, sigs = dim_bias_scale_sigs("ball")
+    dim, scale, bias, sigs, amplitude_train, f0_train, amplitude_val, f0_val = dim_bias_scale_sigs("ball")
+    generator = simple_experiment("ball", 20, 1000, amplitude_train, f0_train)
     X0 = sample_initial_states(20, 3, {"identifies": "uniform", "seed": 41, "scale": scale, "bias": bias})
     X, u, xdot, y, trajectories = generator.get_data(X0)
     a = get_noise_bound(u, 5)
@@ -278,7 +290,7 @@ if __name__ == "__main__":
     print(std)
     print(np.mean(np.abs(xdot_hat - xdot) / std), np.mean(np.abs(xdot_hat - xdot)))
 
-    for j in range(0, 3):
+    for j in range(4, 20):
         X, u, y, _ = trajectories[j]
         print(X[0])
         dt = 1 / 100
@@ -286,10 +298,10 @@ if __name__ == "__main__":
         X = X[:-1]
         u = u[:-1]
 
-        fig, ax = plt.subplots(X.shape[-1] + 1, 1, figsize=(10, 10))
+        fig, ax = plt.subplots(X.shape[-1] + u.shape[-1], 1, figsize=(10, 10))
         for i in range(X.shape[-1]):
             ax[i].plot(X[:, i], label=f"X_{i}", color="red")
             #ax[i].plot(xdot[:, i], label=f"Xdot_{i}", color="blue")
-        ax[-1].plot(u, label="u")
-        plt.legend()
+        for i in range(u.shape[-1]):
+            ax[i + X.shape[-1]].plot(u[:, i], label=f"u_{i}", color="green")
         plt.show()

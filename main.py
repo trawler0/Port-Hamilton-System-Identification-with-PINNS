@@ -10,11 +10,12 @@ from data import dim_bias_scale_sigs
 import mlflow
 import argparse
 import random
+from sklearn.preprocessing import StandardScaler
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--name", type=str, default="ball")
 parser.add_argument("--num_trajectories", type=int, default=100)
-parser.add_argument("--num_val_trajectories", type=int, default=1000)
+parser.add_argument("--num_val_trajectories", type=int, default=100)
 parser.add_argument("--hidden_dim", type=int, default=32)
 parser.add_argument("--depth", type=int, default=3)
 parser.add_argument("--J", type=str, default="default")
@@ -43,6 +44,8 @@ parser.add_argument("--dB", type=float, default=None)
 parser.add_argument("--baseline", action="store_true", default=False)
 parser.add_argument("--experiment", type=str, default="0")
 parser.add_argument("--num_avg", type=int, default=1)
+parser.add_argument("--rescale_epochs", type=int, default=1)
+
 
 args = parser.parse_args()
 try:
@@ -78,10 +81,10 @@ with mlflow.start_run(run_name=args.run_name, experiment_id=experiment_id):
     dt = time / steps
 
     name = args.name
-    DIM, scale, bias, sigs = dim_bias_scale_sigs(name)
+    DIM, scale, bias, sigs, amplitude_train, f0_train, amplitude_val, f0_val = dim_bias_scale_sigs(name)
 
-    generator = simple_experiment(name, time, steps)
-    generator_val = simple_experiment(name, time, steps)
+    generator = simple_experiment(name, time, steps, amplitude_train, f0_train)
+    generator_val = simple_experiment(name, time, steps, amplitude_val, f0_val)
 
     X0_train = sample_initial_states(args.num_trajectories, DIM,
                                      {"identifies": "uniform", "seed": args.seed, "scale": scale, "bias": bias})
@@ -90,6 +93,32 @@ with mlflow.start_run(run_name=args.run_name, experiment_id=experiment_id):
 
     X, u, xdot, y, _ = generator.get_data(X0_train)
     X_val, u_val, xdot_val, y_val, trajectories_val = generator_val.get_data(X0_val)
+
+    scaler_X = StandardScaler()
+    scaler_u = StandardScaler()
+    X = scaler_X.fit_transform(X)
+    print(X.shape)
+    print(scaler_X.scale_)
+    u = scaler_u.fit_transform(u)
+
+    class Predictor(nn.Module):
+
+        def __init__(self, model, scaler_X, scaler_u):
+            super().__init__()
+            self.model = model
+            self.scaler_X = scaler_X
+            self.scaler_u = scaler_u
+
+        def forward(self, x, u):
+            x = x.detach().numpy()
+            u = u.detach().numpy()
+            x = self.scaler_X.transform(x)
+            u = self.scaler_u.transform(u)
+            x = torch.tensor(x).float()
+            u = torch.tensor(u).float()
+            xdot, y = self.model(x, u)
+            return xdot, y
+
     if args.dB is not None:
         a = get_noise_bound(u, args.dB)
         b = get_noise_bound(y, args.dB)
@@ -132,9 +161,10 @@ with mlflow.start_run(run_name=args.run_name, experiment_id=experiment_id):
 
         model = TrainingModule(model, loss_fn=args.criterion, lr=args.lr, weight_decay=args.weight_decay,
                                output_weight=args.output_weight)
-        trainer = Trainer(max_epochs=args.epochs // args.repeat, enable_checkpointing=False, logger=False,
+        trainer = Trainer(max_epochs=int(args.epochs // args.repeat * args.rescale_epochs), enable_checkpointing=False, logger=False,
                           accelerator="cpu", gradient_clip_val=1)
         trainer.fit(model, train_loader)
+        model = Predictor(model.model, scaler_X, scaler_u) # for eval
         models.append(model)
     mlflow.pytorch.log_model(model, "model")
 
@@ -147,7 +177,7 @@ with mlflow.start_run(run_name=args.run_name, experiment_id=experiment_id):
     forecast_examples = args.forecast_examples
     t = np.array([dt * s for s in range(steps)])
 
-    generator_val = simple_experiment(name, time, steps)
+    generator_val = simple_experiment(name, time, steps, amplitude_val, f0_val)
     _, _, _, _, trajectories_val = generator_val.get_data(X0_val[:forecast_examples])
     visualize_trajectory(model, forecast_examples, steps, dt, trajectories_val, a=None, b=None)
 

@@ -24,20 +24,20 @@ def sample_initial_states(num_trajectories, dim, strategy):
         X0 = X0 + np.reshape(strategy["bias"], (1, dim))
     return X0
 
-def multi_sin_signal(n_signals=1, amplitude=.2, seed=None):
+def multi_sin_signal(n_signals=1, f_0=.1, amplitude=.2, seed=None):
     if seed is not None:
         np.random.seed(seed)
-    i = np.arange(5)
-    i, phi = np.stack([i] * n_signals), np.random.uniform(0, 2 * np.pi, (n_signals, 5))
+    i = np.arange(40)
+    i, phi = np.stack([i] * n_signals), np.random.uniform(0, 2 * np.pi, (n_signals, 40))
     def u(t):
-        sins = np.sin(2 * np.pi * i * .1 * t / 10 + phi)
+        sins = np.sin(2 * np.pi * i * f_0 * t + phi)
         out = np.sum(sins, axis=-1) * amplitude
         return out
     return u
 
 
 @torch.no_grad()
-def forecast(model, X0, u, dt, signal, steps, clamp=100., a=None, b=None):
+def forecast(model, X0, u, dt, signal, steps, clamp=None, a=None, b=None):
     model.eval()
     X = torch.zeros(X0.shape[0], steps, X0.shape[-1])
     u = torch.tensor(u)
@@ -63,7 +63,8 @@ def forecast(model, X0, u, dt, signal, steps, clamp=100., a=None, b=None):
         k4 = model(X[:, i] + k3 * dt, u_end)[0]
         X[:, i+1] = X[:, i] + (k1 + 2 * k2 + 2 * k3 + k4) * dt / 6
 
-        X[:, i+1] = torch.clamp(X[:, i+1], -clamp, clamp)
+        if clamp is not None:
+            X[:, i+1] = torch.clamp(X[:, i+1], -clamp, clamp)
         t += dt
     return X
 
@@ -168,6 +169,8 @@ def visualize_trajectory(model, forecast_examples, steps, dt, trajectories, a=No
     tmpdir = tempfile.TemporaryDirectory()
     np.save(os.path.join(tmpdir.name, "X_pred.npy"), X_pred)
     np.save(os.path.join(tmpdir.name, "X.npy"), X)
+    m, M = np.min(X, axis=(0, 1)), np.max(X, axis=(0, 1))
+    X_pred = np.clip(X_pred, m, M)
     if mlflow.active_run() is not None:
         mlflow.log_artifact(os.path.join(tmpdir.name, "X_pred.npy"))
         mlflow.log_artifact(os.path.join(tmpdir.name, "X.npy"))

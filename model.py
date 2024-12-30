@@ -88,7 +88,7 @@ class JLinear(nn.Module):
 
     def reparam(self, x):
         J = (self.J_ - self.J_.T)
-        return J.unsqueeze(0).expand(x.size(0), -1, -1)
+        return J.unsqueeze(0).expand(x.size(0), -1, -1).T
 
 
 class RLinear(nn.Module):
@@ -124,16 +124,18 @@ class Grad_HLinear(nn.Module):
     def __init__(self, dim):
         super().__init__()
         self.Q_ = nn.Parameter(torch.randn(dim, dim))
+        self.bias = nn.Parameter(torch.randn(dim))
 
         nn.init.kaiming_normal_(self.Q_)
 
+
     def forward(self, x):
         Q = self.Q_ @ self.Q_.T
-        return F.linear(x, Q)
+        return F.linear(x, Q, bias=self.bias)
 
     def H(self, x):
         Q = self.Q_ @ self.Q_.T
-        return (F.linear(x, Q) @ x.unsqueeze(-1)).squeeze(-1)
+        return (F.linear(x, Q, bias=self.bias) @ x.unsqueeze(-1)).squeeze(-1)
 
 
 class JDefault(nn.Module):
@@ -160,7 +162,7 @@ class JDefault(nn.Module):
     def reparam(self, x):
         J_ = self.vsu(self.J_(x))
         J = J_ - J_.permute(0, 2, 1)
-        return J
+        return J.permute(0, 2, 1)
 
 
 class RDefault(nn.Module):
@@ -391,7 +393,8 @@ class PHNNModel(nn.Module):
 
 
 if __name__ == "__main__":
-    model = PHNNModel(4, 10, 3, J="default_kan", R="default_kan", grad_H="gradient_kan", G="kan", excitation="mlp", u_dim=2)
+    model = PHNNModel(4, 32, 3, J="default", R="default", grad_H="linear", G="mlp", excitation="mlp", u_dim=2)
     x = torch.randn(256, 4)
     u = torch.randn(256, 2)
     print(sum(p.numel() for p in model.parameters()))
+    print(model(x, u))
