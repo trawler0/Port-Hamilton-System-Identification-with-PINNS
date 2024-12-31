@@ -218,9 +218,9 @@ def simple_experiment(name, simulation_time, num_steps, amplitude, f0, **kwargs)
         get_u = partial(multi_sin_signal, n_signals=2, amplitude=amplitude, f_0=f0)
         return CoupledSpringMassDamper(G, masses, spring_constants, damping, simulation_time, num_steps, get_u)
     elif name == "ball":
-        m = kwargs.pop("m", .1)  # Hannes: 0.012, Achraf: 1.
-        R = kwargs.pop("R", .1)  # Hannes: 0.1, Achraf: 0.1
-        c = kwargs.pop("c", 1.)  # Hannes: 0.1, Achraf: 1.
+        m = kwargs.pop("m", .1)
+        R = kwargs.pop("R", .1)
+        c = kwargs.pop("c", 1.)
         G = kwargs.pop("G", np.array([[0], [0], [1]]))
         if mlflow.active_run():
             mlflow.log_params({"data_m": m, "data_R": R, "data_c": c, "data_G": G})

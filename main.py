@@ -97,8 +97,6 @@ with mlflow.start_run(run_name=args.run_name, experiment_id=experiment_id):
     scaler_X = StandardScaler()
     scaler_u = StandardScaler()
     X = scaler_X.fit_transform(X)
-    print(X.shape)
-    print(scaler_X.scale_)
     u = scaler_u.fit_transform(u)
 
     class Predictor(nn.Module):

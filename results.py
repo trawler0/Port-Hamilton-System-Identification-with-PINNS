@@ -150,6 +150,13 @@ def recipe():
         ax.plot(time, X_pred[idx, :10000, state], label=rename(run_name), color=colors[run_name], linestyle=line_styles[run_name], linewidth=thickness[run_name])
     ax.axvline(x=10., color='purple', linestyle='--', linewidth=2)
     ax.grid()
+    ax.axvspan(
+        0,
+        10,
+        color='gray',
+        alpha=0.1,  # Adjust alpha for transparency
+        label='training duration'  # Optional: label for the legend
+    )
     ax.set_xlabel("Time [s]", fontsize=32)
     ax.set_ylabel(f"Momentum $p_2$", fontsize=32)
     ax.tick_params(axis='both', which='major', labelsize=32)
@@ -195,9 +202,16 @@ def compare():
                 return "Baseline"
         ax.plot(t, X_pred[idx, :1500, state], label=rename(run_name), color=colors[run_name], linestyle=line_styles[run_name], linewidth=thickness[run_name])
     ax.axvline(x=10., color='purple', linestyle='--', linewidth=2)
-    ax.legend(fontsize=32)
     ax.tick_params(axis='both', which='major', labelsize=32)
+    ax.axvspan(
+        0,
+        10,
+        color='gray',
+        alpha=0.1,  # Adjust alpha for transparency
+        label='training duration'  # Optional: label for the legend
+    )
     ax.grid()
+    ax.legend(fontsize=32)
     #plt.show()
     plt.savefig(os.path.join("results", "compare.png"))
 
@@ -366,14 +380,14 @@ def noise():
                     X_pred = np.load(artifact_file_path)
                     X_true = np.load(artifact_file_path.replace("X_pred", "X"))
                     preds[run_name] = X_pred
-    idx = 8
+    idx = 14
     state = 2
     n = X_pred.shape[-1]
     fig, ax = plt.subplots(1, 1, figsize=(30, 15))
     ax.set_xlabel("Time [s]", fontsize=32)
     ax.set_ylabel("Flux $x_3$", fontsize=32)
     ax.tick_params(axis='both', which='major', labelsize=32)
-    N = 300
+    N = 4000
     t = np.arange(N) * 0.01
     ax.plot(t, X_true[idx, :N, state], label="True", color=colors["True"], linestyle=line_styles["True"], linewidth=thickness["True"])
     for run_name in ["noise25", "noise30", "no_noise"]:
@@ -389,8 +403,28 @@ def noise():
             elif name == "no_noise":
                 return "No noise"
         ax.plot(t, X_pred[idx, :N, state], label=rename(run_name), color=colors[run_name], linestyle=line_styles[run_name], linewidth=thickness[run_name])
+    # Add shaded area and vertical line if N >= 1000
     if N >= 1000:
-        ax.axvline(x=10., color='purple', linestyle='--', linewidth=2)
+        # Define the shading range around x=10
+        x_start = 0  # Start shading at x=9.5
+        x_end = 10.0  # End shading at x=10.5
+
+        # Add the shaded region
+        ax.axvspan(
+            x_start,
+            x_end,
+            color='gray',
+            alpha=0.1,  # Adjust alpha for transparency
+            label='training duration'  # Optional: label for the legend
+        )
+
+        # Add the vertical line
+        ax.axvline(
+            x=10.0,
+            color='purple',
+            linestyle='--',
+            linewidth=2,
+        )
     ax.legend(fontsize=32)
     ax.grid()
     #plt.show()
@@ -398,14 +432,10 @@ def noise():
 
 
 
-
-
-
-
-#noise()
-#plot_scaling("ball")
+noise()
+plot_scaling("ball")
 plot_scaling("motor")
-#plot_scaling("spring")
+plot_scaling("spring")
 recipe()
 compare()
 prior_vs_default()
