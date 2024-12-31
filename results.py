@@ -287,6 +287,79 @@ def prior_vs_default():
     plt.savefig(os.path.join("results", "compare_R.png"))
     #plt.show()
 
+def prior_vs_default_motor():
+    experiment = mlflow.get_experiment_by_name("scaling_motor")
+    runs = mlflow.search_runs(experiment.experiment_id)
+    models = {}
+    for i, run in runs.iterrows():
+        run_id = run["run_id"]
+        run = mlflow.get_run(run_id)
+        params = run.data.params
+        if not params["run_name"] in ["motor_prior_100", "motor_default_100"]:
+            continue
+        run_name = params["run_name"]
+        name = params["name"]
+        artifacts_path = mlflow.artifacts.download_artifacts(run_id=run_id)
+
+        # Example: If artifact is a file, handle it
+        for root, _, files in os.walk(artifacts_path):
+            for file in files:
+                artifact_file_path = os.path.join(root, file)
+                if file == "model.pth" or file.endswith(".pt"):
+                    # Assuming the model was saved with a specific extension
+                    model_uri = f"runs:/{run_id}/model"
+                    try:
+                        model = mlflow.pytorch.load_model(model_uri)
+                        models[run_name] = model
+                    except Exception as e:
+                        print(f"Failed to load model for run {run_id}: {e}")
+        dim, scale, bias, sigs, amplitude_train, f0_train, amplitude_val, f0_val = dim_bias_scale_sigs(name)
+        X = sample_initial_states(500, dim, {"identifies": "uniform", "seed": 41})
+        generator = simple_experiment(name, 10, 1000, amplitude_val, f0_val)
+        grad_H = np.stack([generator.grad_H(x) for x in X], axis=0)
+        S = np.stack([generator.J(x) for i, x in enumerate(X)], axis=0)
+        H_preds = {
+        }
+        S_preds = {
+        }
+        for run_name, model in models.items():
+            X = torch.tensor(X).float()
+            H_pred = model.model.grad_H(X)
+            S_pred = model.model.reparam(X)[0]
+            H_preds[run_name] = H_pred.detach().numpy()
+            S_preds[run_name] = S_pred.detach().numpy()
+    fig, ax = plt.subplots(1, 1, figsize=(30, 30))
+    for run_name, H_pred in H_preds.items():
+        def rename(name):
+            if name == "motor_default_100":
+                return "pH"
+            elif name == "motor_prior_100":
+                return "pH prior"
+        idx = 0
+        ax.scatter(grad_H[:, idx], H_pred[:, idx], label=rename(run_name), color=colors["default" if run_name == "motor_default_100" else "prior"])
+        correlation = np.corrcoef(grad_H[:, idx], H_pred[:, idx])[0, 1]
+        print(f"Correlation for {run_name}: {correlation}")
+    ax.set_ylabel(r"Identified $\frac{\partial H(x)}{\partial x_1}$", fontsize=64)
+    ax.set_xlabel(r"True $\frac{\partial H(x)}{\partial x_1}$", fontsize=64)
+    ax.tick_params(labelleft=False, labelbottom=False)
+    ax.legend(fontsize=64)
+    plt.savefig(os.path.join("results", "compare_H_motor.png"))
+
+    fig, ax = plt.subplots(1, 1, figsize=(30, 30))
+    for run_name, S_pred in S_preds.items():
+        idx1 = 2
+        idx2 = 0
+        ax.scatter(S[:, idx1, idx2], S_pred[:, idx1, idx2], label=rename(run_name), color=colors["default" if run_name == "motor_default_100" else "prior"])
+        correlation = np.corrcoef(S[:, idx1, idx2], S_pred[:, idx1, idx2])[0, 1]
+        print(f"Correlation for {run_name}: {correlation}")
+    ax.set_ylabel(r"Identified $S_{13}(x)$", fontsize=64)
+    ax.set_xlabel(r"True $S_{13}(x)$", fontsize=64)
+    ax.tick_params(labelleft=False, labelbottom=False)
+    ax.legend(fontsize=64)
+
+    plt.savefig(os.path.join("results", "compare_J_motor.png"))
+    #plt.show()
+
 def prior_comparison():
     experiment = mlflow.get_experiment_by_name("prior_comparison")
     all_runs = mlflow.search_runs(experiment.experiment_id)
@@ -440,3 +513,4 @@ recipe()
 compare()
 prior_vs_default()
 #prior_comparison()
+prior_vs_default_motor()
