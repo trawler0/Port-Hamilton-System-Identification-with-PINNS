@@ -255,9 +255,9 @@ def dim_bias_scale_sigs(name):
         scale = np.array([[2.5, .4, 7.]])
         bias = np.array([[-.5, -.2, -3.]])
         sigs = 1
-        amplitude_train = .3
+        amplitude_train = 1.
         f0_train = .1
-        amplitude_val = .3
+        amplitude_val = 1.
         f0_val = .1
     elif name == "motor":
         DIM = 3
@@ -290,7 +290,7 @@ if __name__ == "__main__":
     print(std)
     print(np.mean(np.abs(xdot_hat - xdot) / std), np.mean(np.abs(xdot_hat - xdot)))
 
-    for j in range(4, 20):
+    for j in range(4, 8):
         X, u, y, _ = trajectories[j]
         print(X[0])
         dt = 1 / 100

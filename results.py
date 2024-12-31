@@ -22,12 +22,12 @@ colors = {
     "wrong": "turquoise",
     "generic": "magenta",
     "quadratic": "black",
-    "noise20": "blue",
-    "noise25": "red",
+    "no_noise": "red",
+    "noise25": "blue",
     "noise30": "green",
 }
 line_styles = {
-    "True": "-",
+    "True": "solid",
     "baseline": "--",
     "default": "--",
     "prior": "--",
@@ -41,12 +41,12 @@ line_styles = {
     "generic": "--",
 }
 thickness = {
-    "True": 3,
+    "True": 5,
     "baseline": 1.5,
     "default": 1.5,
     "prior": 1.5,
-    "shallow": 1.5,
-    "shorter": 1.5,
+    "shallow": 3,
+    "shorter": 3,
     "noise30": 1.5,
     "noise25": 1.5,
     "noise20": 1.5,
@@ -134,11 +134,11 @@ def recipe():
                     X_true = np.load(artifact_file_path.replace("X_pred", "X"))
                     preds[run_name] = X_pred
     n = X_pred.shape[-1]
-    idx = 14
+    idx = 16
     state = 3
     fig, ax = plt.subplots(1, 1, figsize=(30, 15))
     time = np.arange(len(X_true[idx, :10000, state])) * 0.01
-    ax.plot(time, X_true[idx, :10000, state], label="True", color="black", linestyle="-", linewidth=thickness["True"])
+    ax.plot(time, X_true[idx, :10000, state], label="True", color=colors["True"], linestyle=line_styles["True"], linewidth=thickness["True"])
     for run_name, X_pred in preds.items():
         def rename(name):
             if name == "shallow":
@@ -152,6 +152,7 @@ def recipe():
     ax.grid()
     ax.set_xlabel("Time [s]", fontsize=32)
     ax.set_ylabel(f"Momentum $p_2$", fontsize=32)
+    ax.tick_params(axis='both', which='major', labelsize=32)
     ax.legend(fontsize=32)
     #plt.show()
     plt.savefig(os.path.join("results", "recipe.png"))
@@ -176,14 +177,14 @@ def compare():
                     X_true = np.load(artifact_file_path.replace("X_pred", "X"))
                     preds[run_name] = X_pred
 
-    idx = 16
-    state = 0
+    idx = 12
+    state = 1
     n = X_pred.shape[-1]
     fig, ax = plt.subplots(1, 1, figsize=(30, 15))
     ax.set_xlabel("Time [s]", fontsize=32)
     ax.set_ylabel("Momentum $x_2$", fontsize=32)
     t = np.arange(1500) * 0.01
-    ax.plot(t, X_true[idx, :1500, state], label="True", color="black", linestyle="-", linewidth=thickness["True"])
+    ax.plot(t, X_true[idx, :1500, state], label="True", color=colors["True"], linestyle=line_styles["True"], linewidth=thickness["True"])
     for run_name, X_pred in preds.items():
         def rename(name):
             if name == "prior":
@@ -195,6 +196,7 @@ def compare():
         ax.plot(t, X_pred[idx, :1500, state], label=rename(run_name), color=colors[run_name], linestyle=line_styles[run_name], linewidth=thickness[run_name])
     ax.axvline(x=10., color='purple', linestyle='--', linewidth=2)
     ax.legend(fontsize=32)
+    ax.tick_params(axis='both', which='major', labelsize=32)
     ax.grid()
     #plt.show()
     plt.savefig(os.path.join("results", "compare.png"))
@@ -364,16 +366,18 @@ def noise():
                     X_pred = np.load(artifact_file_path)
                     X_true = np.load(artifact_file_path.replace("X_pred", "X"))
                     preds[run_name] = X_pred
-    idx = 16
-    state = 0
+    idx = 8
+    state = 2
     n = X_pred.shape[-1]
     fig, ax = plt.subplots(1, 1, figsize=(30, 15))
     ax.set_xlabel("Time [s]", fontsize=32)
-    ax.set_ylabel("Momentum $x_2$", fontsize=32)
+    ax.set_ylabel("Flux $x_3$", fontsize=32)
     ax.tick_params(axis='both', which='major', labelsize=32)
-    t = np.arange(300) * 0.01
-    ax.plot(t, X_true[idx, :300, state], label="True", color="black", linestyle="-", linewidth=thickness["True"])
-    for run_name, X_pred in preds.items():
+    N = 300
+    t = np.arange(N) * 0.01
+    ax.plot(t, X_true[idx, :N, state], label="True", color=colors["True"], linestyle=line_styles["True"], linewidth=thickness["True"])
+    for run_name in ["noise25", "noise30", "no_noise"]:
+        X_pred = preds[run_name]
         print(run_name)
         def rename(name):
             if name == "noise20":
@@ -382,23 +386,27 @@ def noise():
                 return "25 dB"
             elif name == "noise30":
                 return "30 dB"
-        ax.plot(t, X_pred[idx, :300, state], label=rename(run_name), color=colors[run_name], linestyle=line_styles[run_name], linewidth=thickness[run_name])
-    #ax.axvline(x=10., color='purple', linestyle='--', linewidth=2)
+            elif name == "no_noise":
+                return "No noise"
+        ax.plot(t, X_pred[idx, :N, state], label=rename(run_name), color=colors[run_name], linestyle=line_styles[run_name], linewidth=thickness[run_name])
+    if N >= 1000:
+        ax.axvline(x=10., color='purple', linestyle='--', linewidth=2)
     ax.legend(fontsize=32)
     ax.grid()
     #plt.show()
-    plt.savefig(os.path.join("results", "noise.png"))
+    plt.savefig(os.path.join("results", f"noise_{N}.png"))
 
 
 
 
 
 
-noise()
-"""plot_scaling("ball")
+
+#noise()
+#plot_scaling("ball")
 plot_scaling("motor")
-plot_scaling("spring")
+#plot_scaling("spring")
 recipe()
 compare()
-prior_vs_default()"""
+prior_vs_default()
 #prior_comparison()

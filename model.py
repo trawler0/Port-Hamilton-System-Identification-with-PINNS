@@ -88,7 +88,7 @@ class JLinear(nn.Module):
 
     def reparam(self, x):
         J = (self.J_ - self.J_.T)
-        return J.unsqueeze(0).expand(x.size(0), -1, -1).T
+        return J.unsqueeze(0).expand(x.size(0), -1, -1).permute(0, 2, 1)
 
 
 class RLinear(nn.Module):
