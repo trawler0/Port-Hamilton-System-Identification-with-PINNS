@@ -72,6 +72,22 @@ class Baseline(nn.Module):
         out = self.mlp(xu)
         return out[:, :-u_dim], out[:, -u_dim:]
 
+class InputAffine(nn.Module):
+
+    def __init__(self, input_dim, hidden_dim, u_dim, depth):
+        super().__init__()
+        self.A = MLP(input_dim, hidden_dim, input_dim, depth)
+        self.B = MLP(input_dim, hidden_dim, input_dim * u_dim, depth)
+        self.C = MLP(input_dim, hidden_dim, u_dim, depth)  # assume output dim same as input dim
+        self.D = MLP(input_dim, hidden_dim, u_dim * u_dim, depth)
+
+    def forward(self, x, u):
+        B, D = x.shape
+        U = u.shape[-1]
+        xdot = self.A(x) + (self.B(x).view(B, D, U) * u.view(B, 1, U)).sum(-1)
+        y = self.C(x) + (self.D(x).view(B, U, U) * u.view(B, 1, U)).sum(-1)
+
+        return xdot, y
 
 
 class JLinear(nn.Module):
@@ -397,4 +413,7 @@ if __name__ == "__main__":
     x = torch.randn(256, 4)
     u = torch.randn(256, 2)
     print(sum(p.numel() for p in model.parameters()))
-    print(model(x, u))
+    print(model(x, u)[0].shape, model(x, u)[1].shape)
+    model = InputAffine(4, 4, 2, 3)
+    print(sum(p.numel() for p in model.parameters()))
+    print(model(x, u)[0].shape, model(x, u)[1].shape)
