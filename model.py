@@ -393,7 +393,7 @@ class PHNNModel(nn.Module):
 
 
 if __name__ == "__main__":
-    model = PHNNModel(4, 32, 3, J="default", R="default", grad_H="linear", G="mlp", excitation="mlp", u_dim=2)
+    model = PHNNModel(4, 4, 3, u_dim=2)
     x = torch.randn(256, 4)
     u = torch.randn(256, 2)
     print(sum(p.numel() for p in model.parameters()))

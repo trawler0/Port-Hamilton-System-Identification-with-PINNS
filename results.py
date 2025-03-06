@@ -5,6 +5,7 @@ import os
 from data import simple_experiment, dim_bias_scale_sigs
 from utils import sample_initial_states
 import torch
+from scipy.optimize import curve_fit
 
 
 #plt.style.use('seaborn-darkgrid')  # You can choose other styles like 'ggplot', 'classic', etc.
@@ -504,8 +505,109 @@ def noise():
     plt.savefig(os.path.join("results", f"noise_{N}.png"))
 
 
+def data_scaling_law():
+    experiment = mlflow.get_experiment_by_name("scaling_initial")
+    runs = mlflow.search_runs(experiment.experiment_id)
 
-noise()
+    compute_ = []
+    traj_val = []
+    mae_rel_ = []
+
+    for i, run in runs.iterrows():
+        try:
+            run_id = run["run_id"]
+            run_data = mlflow.get_run(run_id)
+            params = run_data.data.params
+            metrics = run_data.data.metrics
+
+            epochs = float(params["epochs"])
+            trajectories = float(params["num_trajectories"])
+            compute = epochs * trajectories
+
+            mae_rel = float(metrics["mae_rel"])
+
+            compute_.append(compute)
+            traj_val.append(trajectories)
+            mae_rel_.append(mae_rel)
+        except Exception as e:
+            # Optionally log the error for debugging:
+            # print(f"Error processing run {run_id}: {e}")
+            pass
+
+    # Convert lists to numpy arrays for convenience
+    compute_ = np.array(compute_)
+    traj_val = np.array(traj_val)
+    mae_rel_ = np.array(mae_rel_)
+
+    # Create scatter plot: x = trajectories, y = mae_rel, color by compute_
+    plt.figure(figsize=(8, 6))
+    scatter = plt.scatter(traj_val, mae_rel_, c=np.log(compute_), cmap='coolwarm', edgecolor='k', s=60)
+
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.xlabel("Number of Trajectories (log scale)")
+    plt.ylabel("MAE Relative (log scale)")
+    plt.title("Scaling Law: MAE Relative vs. Number of Trajectories")
+
+    # Create a colorbar to show mapping of compute value to color.
+    cbar = plt.colorbar(scatter)
+    cbar.set_label("Compute (epochs * num_trajectories)")
+
+    plt.grid(True, which="both", ls="--", lw=0.5)
+    plt.show()
+
+def compute_scaling_law():
+    experiment = mlflow.get_experiment_by_name("scaling_initial")
+    runs = mlflow.search_runs(experiment.experiment_id)
+
+    compute_ = []
+    traj_val = []
+    mae_rel_ = []
+
+    for i, run in runs.iterrows():
+        try:
+            run_id = run["run_id"]
+            run_data = mlflow.get_run(run_id)
+            params = run_data.data.params
+            metrics = run_data.data.metrics
+
+            epochs = float(params["epochs"])
+            trajectories = float(params["num_trajectories"])
+            compute = epochs * trajectories
+
+            mae_rel = float(metrics["mae_rel"])
+
+            compute_.append(compute)
+            traj_val.append(trajectories)
+            mae_rel_.append(mae_rel)
+        except Exception as e:
+            # Optionally log the error for debugging:
+            # print(f"Error processing run {run_id}: {e}")
+            pass
+
+    # Convert lists to numpy arrays for convenience
+    compute_ = np.array(compute_)
+    traj_val = np.array(traj_val)
+    mae_rel_ = np.array(mae_rel_)
+
+    # Create scatter plot: x = compute, y = mae_rel, color by trajectories (more red = more trajectories)
+    plt.figure(figsize=(8, 6))
+    scatter = plt.scatter(compute_, mae_rel_, c=np.log(traj_val), cmap='coolwarm', edgecolor='k', s=60)
+
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.xlabel("Compute (epochs * num_trajectories, log scale)")
+    plt.ylabel("MAE Relative (log scale)")
+    plt.title("Scaling Law: MAE Relative vs. Compute")
+
+    # Create a colorbar to show mapping of trajectories to color intensity.
+    cbar = plt.colorbar(scatter)
+    cbar.set_label("Number of Trajectories")
+
+    plt.grid(True, which="both", ls="--", lw=0.5)
+    plt.show()
+
+"""noise()
 plot_scaling("ball")
 plot_scaling("motor")
 plot_scaling("spring")
@@ -513,4 +615,6 @@ recipe()
 compare()
 prior_vs_default()
 prior_comparison()
-prior_vs_default_motor()
+prior_vs_default_motor()"""
+compute_scaling_law()
+data_scaling_law()

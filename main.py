@@ -169,7 +169,7 @@ with mlflow.start_run(run_name=args.run_name, experiment_id=experiment_id):
     metrics = compute_metrics(models, trajectories_val, dt, X_val, u_val, xdot_val, y_val)
     print(metrics)
 
-    steps = args.forecast_steps
+    """steps = args.forecast_steps
     time = args.forecast_time
     dt = time / steps
     forecast_examples = args.forecast_examples
@@ -206,4 +206,4 @@ with mlflow.start_run(run_name=args.run_name, experiment_id=experiment_id):
         scatter(grad_H, grad_H_true, "grad_H")
         scatter(G, G_true, "G")
         scatter(R, R_true, "R")
-        scatter(J, J_true, "S")
+        scatter(J, J_true, "S")"""
