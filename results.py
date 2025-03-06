@@ -505,13 +505,14 @@ def noise():
     plt.savefig(os.path.join("results", f"noise_{N}.png"))
 
 
-def data_scaling_law():
-    experiment = mlflow.get_experiment_by_name("scaling_initial")
+def data_scaling_law(name="default"):
+    experiment = mlflow.get_experiment_by_name(f"scaling_initial_{name}")
     runs = mlflow.search_runs(experiment.experiment_id)
 
     compute_ = []
     traj_val = []
     mae_rel_ = []
+    sizes = []
 
     for i, run in runs.iterrows():
         try:
@@ -523,12 +524,13 @@ def data_scaling_law():
             epochs = float(params["epochs"])
             trajectories = float(params["num_trajectories"])
             compute = epochs * trajectories
-
+            hidden_dim = float(params["hidden_dim"])
             mae_rel = float(metrics["mae_rel"])
 
             compute_.append(compute)
             traj_val.append(trajectories)
             mae_rel_.append(mae_rel)
+            sizes.append(hidden_dim)
         except Exception as e:
             # Optionally log the error for debugging:
             # print(f"Error processing run {run_id}: {e}")
@@ -538,10 +540,12 @@ def data_scaling_law():
     compute_ = np.array(compute_)
     traj_val = np.array(traj_val)
     mae_rel_ = np.array(mae_rel_)
+    sizes = 4 * np.array(sizes)
+
 
     # Create scatter plot: x = trajectories, y = mae_rel, color by compute_
     plt.figure(figsize=(8, 6))
-    scatter = plt.scatter(traj_val, mae_rel_, c=np.log(compute_), cmap='coolwarm', edgecolor='k', s=60)
+    scatter = plt.scatter(traj_val, mae_rel_, c=np.log(compute_), cmap='coolwarm', edgecolor='k', s=sizes)
 
     plt.xscale('log')
     plt.yscale('log')
@@ -554,15 +558,18 @@ def data_scaling_law():
     cbar.set_label("Compute (epochs * num_trajectories)")
 
     plt.grid(True, which="both", ls="--", lw=0.5)
-    plt.show()
+    # plt.show()
+    plt.savefig(os.path.join("results", f"data_scaling_{name}.png"))
 
-def compute_scaling_law():
-    experiment = mlflow.get_experiment_by_name("scaling_initial")
+
+def compute_scaling_law(name="default"):
+    experiment = mlflow.get_experiment_by_name(f"scaling_initial_{name}")
     runs = mlflow.search_runs(experiment.experiment_id)
 
     compute_ = []
     traj_val = []
     mae_rel_ = []
+    sizes = []
 
     for i, run in runs.iterrows():
         try:
@@ -573,6 +580,7 @@ def compute_scaling_law():
 
             epochs = float(params["epochs"])
             trajectories = float(params["num_trajectories"])
+            hidden_dim = float(params["hidden_dim"])
             compute = epochs * trajectories
 
             mae_rel = float(metrics["mae_rel"])
@@ -580,6 +588,7 @@ def compute_scaling_law():
             compute_.append(compute)
             traj_val.append(trajectories)
             mae_rel_.append(mae_rel)
+            sizes.append(hidden_dim)
         except Exception as e:
             # Optionally log the error for debugging:
             # print(f"Error processing run {run_id}: {e}")
@@ -589,10 +598,11 @@ def compute_scaling_law():
     compute_ = np.array(compute_)
     traj_val = np.array(traj_val)
     mae_rel_ = np.array(mae_rel_)
+    sizes = 4 * np.array(sizes)
 
     # Create scatter plot: x = compute, y = mae_rel, color by trajectories (more red = more trajectories)
     plt.figure(figsize=(8, 6))
-    scatter = plt.scatter(compute_, mae_rel_, c=np.log(traj_val), cmap='coolwarm', edgecolor='k', s=60)
+    scatter = plt.scatter(compute_, mae_rel_, c=np.log(traj_val), cmap='coolwarm', edgecolor='k', s=sizes)
 
     plt.xscale('log')
     plt.yscale('log')
@@ -605,7 +615,64 @@ def compute_scaling_law():
     cbar.set_label("Number of Trajectories")
 
     plt.grid(True, which="both", ls="--", lw=0.5)
-    plt.show()
+    # plt.show()
+    plt.savefig(os.path.join("results", f"compute_scaling_{name}.png"))
+
+def dimension_scaling_law(name="default"):
+    experiment = mlflow.get_experiment_by_name(f"scaling_initial_{name}")
+    runs = mlflow.search_runs(experiment.experiment_id)
+
+    compute_ = []
+    traj_val = []
+    mae_rel_ = []
+    sizes = []
+
+    for i, run in runs.iterrows():
+        try:
+            run_id = run["run_id"]
+            run_data = mlflow.get_run(run_id)
+            params = run_data.data.params
+            metrics = run_data.data.metrics
+
+            epochs = float(params["epochs"])
+            trajectories = float(params["num_trajectories"])
+            hidden_dim = float(params["hidden_dim"])
+            compute = epochs * trajectories
+
+            mae_rel = float(metrics["mae_rel"])
+
+            compute_.append(compute)
+            traj_val.append(trajectories)
+            mae_rel_.append(mae_rel)
+            sizes.append(hidden_dim)
+        except Exception as e:
+            # Optionally log the error for debugging:
+            # print(f"Error processing run {run_id}: {e}")
+            pass
+
+    # Convert lists to numpy arrays for convenience
+    compute_ = np.array(compute_)
+    traj_val = np.array(traj_val)
+    mae_rel_ = np.array(mae_rel_)
+    sizes = 4 * np.array(sizes)
+
+    # Create scatter plot: x = compute, y = mae_rel, color by trajectories (more red = more trajectories)
+    plt.figure(figsize=(8, 6))
+    scatter = plt.scatter(sizes, mae_rel_, c=np.log(traj_val), cmap='coolwarm', edgecolor='k', s=10 * np.log(compute_))
+
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.xlabel("Hidden Dim, log scale)")
+    plt.ylabel("MAE Relative (log scale)")
+    plt.title("Scaling Law: MAE Relative vs. Compute")
+
+    # Create a colorbar to show mapping of trajectories to color intensity.
+    cbar = plt.colorbar(scatter)
+    cbar.set_label("Number of Trajectories")
+
+    plt.grid(True, which="both", ls="--", lw=0.5)
+    # plt.show()
+    plt.savefig(os.path.join("results", f"dimension_scaling_{name}.png"))
 
 """noise()
 plot_scaling("ball")
@@ -618,3 +685,7 @@ prior_comparison()
 prior_vs_default_motor()"""
 compute_scaling_law()
 data_scaling_law()
+dimension_scaling_law()
+compute_scaling_law("baseline")
+data_scaling_law("baseline")
+dimension_scaling_law("baseline")
