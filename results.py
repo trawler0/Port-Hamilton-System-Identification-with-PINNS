@@ -505,8 +505,8 @@ def noise():
     plt.savefig(os.path.join("results", f"noise_{N}.png"))
 
 
-def data_scaling_law(name="default"):
-    experiment = mlflow.get_experiment_by_name(f"scaling_initial_{name}")
+def data_scaling_law(name, method="default"):
+    experiment = mlflow.get_experiment_by_name(f"scaling_initial_{method}_{name}")
     runs = mlflow.search_runs(experiment.experiment_id)
 
     compute_ = []
@@ -559,11 +559,11 @@ def data_scaling_law(name="default"):
 
     plt.grid(True, which="both", ls="--", lw=0.5)
     # plt.show()
-    plt.savefig(os.path.join("results", f"data_scaling_{name}.png"))
+    plt.savefig(os.path.join("results", f"data_scaling_{method}_{name}.png"))
 
 
-def compute_scaling_law(name="default"):
-    experiment = mlflow.get_experiment_by_name(f"scaling_initial_{name}")
+def compute_scaling_law(name, method="default"):
+    experiment = mlflow.get_experiment_by_name(f"scaling_initial_{method}_{name}")
     runs = mlflow.search_runs(experiment.experiment_id)
 
     compute_ = []
@@ -616,10 +616,10 @@ def compute_scaling_law(name="default"):
 
     plt.grid(True, which="both", ls="--", lw=0.5)
     # plt.show()
-    plt.savefig(os.path.join("results", f"compute_scaling_{name}.png"))
+    plt.savefig(os.path.join("results", f"compute_scaling_{method}_{name}.png"))
 
-def dimension_scaling_law(name="default"):
-    experiment = mlflow.get_experiment_by_name(f"scaling_initial_{name}")
+def dimension_scaling_law(name, method="default"):
+    experiment = mlflow.get_experiment_by_name(f"scaling_initial_{method}_{name}")
     runs = mlflow.search_runs(experiment.experiment_id)
 
     compute_ = []
@@ -672,7 +672,7 @@ def dimension_scaling_law(name="default"):
 
     plt.grid(True, which="both", ls="--", lw=0.5)
     # plt.show()
-    plt.savefig(os.path.join("results", f"dimension_scaling_{name}.png"))
+    plt.savefig(os.path.join("results", f"dimension_scaling_{method}_{name}.png"))
 
 """noise()
 plot_scaling("ball")
@@ -683,9 +683,15 @@ compare()
 prior_vs_default()
 prior_comparison()
 prior_vs_default_motor()"""
-compute_scaling_law()
-data_scaling_law()
-dimension_scaling_law()
-compute_scaling_law("baseline")
-data_scaling_law("baseline")
-dimension_scaling_law("baseline")
+"""compute_scaling_law("ball")
+data_scaling_law("ball")
+dimension_scaling_law("ball")
+compute_scaling_law("ball", "baseline")
+data_scaling_law("ball", "baseline")
+dimension_scaling_law("ball", "baseline")"""
+compute_scaling_law("ball", "affine")
+print(1)
+data_scaling_law("ball", "affine")
+print(2)
+dimension_scaling_law("ball", "affine")
+print(3)

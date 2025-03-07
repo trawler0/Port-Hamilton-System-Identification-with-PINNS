@@ -25,7 +25,9 @@ parser.add_argument("--output-weight", type=float, default=.25)
 parser.add_argument("--excitation", type=str, default="mlp")
 parser.add_argument("--grad_H", type=str, default="gradient")
 parser.add_argument("--time", type=float, default=10)
+parser.add_argument("--val_time", type=float, default=100)
 parser.add_argument("--steps", type=int, default=None)
+parser.add_argument("--val_steps", type=int, default=None)
 parser.add_argument("--lr", type=float, default=1e-3)
 parser.add_argument("--epochs", type=int, default=500)
 parser.add_argument("--criterion", type=str, default="normalized_mse")
@@ -42,9 +44,11 @@ parser.add_argument("--example", type=str, default=None)
 parser.add_argument("--tag", type=str, default=None)
 parser.add_argument("--dB", type=float, default=None)
 parser.add_argument("--baseline", action="store_true", default=False)
+parser.add_argument("--affine", action="store_true", default=False)
 parser.add_argument("--experiment", type=str, default="0")
 parser.add_argument("--num_avg", type=int, default=1)
 parser.add_argument("--rescale_epochs", type=int, default=1)
+parser.add_argument("--no-forecast", action="store_true")
 
 
 args = parser.parse_args()
@@ -78,13 +82,14 @@ with mlflow.start_run(run_name=args.run_name, experiment_id=experiment_id):
     mlflow.pytorch.autolog()
     time = args.time
     steps = args.steps if args.steps is not None else int(100 * args.time)
+    val_steps = args.val_steps if args.val_steps is not None else int(100 * args.val_time)
     dt = time / steps
 
     name = args.name
     DIM, scale, bias, sigs, amplitude_train, f0_train, amplitude_val, f0_val = dim_bias_scale_sigs(name)
 
     generator = simple_experiment(name, time, steps, amplitude_train, f0_train)
-    generator_val = simple_experiment(name, time, steps, amplitude_val, f0_val)
+    generator_val = simple_experiment(name, args.val_time, val_steps, amplitude_val, f0_val)
 
     X0_train = sample_initial_states(args.num_trajectories, DIM,
                                      {"identifies": "uniform", "seed": args.seed, "scale": scale, "bias": bias})
@@ -151,8 +156,11 @@ with mlflow.start_run(run_name=args.run_name, experiment_id=experiment_id):
         train_loader = torch.utils.data.DataLoader(train_ds, batch_size=args.batch_size, shuffle=True)
         val_loader = torch.utils.data.DataLoader(val_ds, batch_size=len(val_ds), shuffle=False)
 
+        assert not (args.baseline and args.affine)
         if args.baseline:
             model = Baseline(DIM, 2 * args.hidden_dim, sigs, args.depth)
+        elif args.affine:
+            model = InputAffine(DIM, 2 * args.hidden_dim, sigs, args.depth)
         else:
             model = PHNNModel(DIM, args.hidden_dim, args.depth, J=args.J, R=args.R, grad_H=args.grad_H, G=args.G,
                               excitation=args.excitation, u_dim=sigs)
@@ -169,41 +177,42 @@ with mlflow.start_run(run_name=args.run_name, experiment_id=experiment_id):
     metrics = compute_metrics(models, trajectories_val, dt, X_val, u_val, xdot_val, y_val)
     print(metrics)
 
-    """steps = args.forecast_steps
-    time = args.forecast_time
-    dt = time / steps
-    forecast_examples = args.forecast_examples
-    t = np.array([dt * s for s in range(steps)])
+    if not args.not_forecast:
+        steps = args.forecast_steps
+        time = args.forecast_time
+        dt = time / steps
+        forecast_examples = args.forecast_examples
+        t = np.array([dt * s for s in range(steps)])
 
-    generator_val = simple_experiment(name, time, steps, amplitude_val, f0_val)
-    _, _, _, _, trajectories_val = generator_val.get_data(X0_val[:forecast_examples])
-    visualize_trajectory(model, forecast_examples, steps, dt, trajectories_val, a=None, b=None)
+        generator_val = simple_experiment(name, time, steps, amplitude_val, f0_val)
+        _, _, _, _, trajectories_val = generator_val.get_data(X0_val[:forecast_examples])
+        visualize_trajectory(model, forecast_examples, steps, dt, trajectories_val, a=None, b=None)
 
-    if not args.baseline:
-        X = np.concatenate([xu[0] for xu in trajectories_val])
-        G_true = np.stack([generator_val.G(x) for x in X])
-        R_true = np.stack([generator_val.R(x) for x in X])
-        J_true = np.stack([generator_val.J(x) for x in X])
-        grad_H_true = np.stack([generator_val.grad_H(x) for x in X])
+        if not args.baseline:
+            X = np.concatenate([xu[0] for xu in trajectories_val])
+            G_true = np.stack([generator_val.G(x) for x in X])
+            R_true = np.stack([generator_val.R(x) for x in X])
+            J_true = np.stack([generator_val.J(x) for x in X])
+            grad_H_true = np.stack([generator_val.grad_H(x) for x in X])
 
-        X = torch.tensor(X).float()
-        J, R = model.model.reparam(X)
-        G = model.model.G(X)
-        grad_H = model.model.grad_H(X)
+            X = torch.tensor(X).float()
+            J, R = model.model.reparam(X)
+            G = model.model.G(X)
+            grad_H = model.model.grad_H(X)
 
-        J = np.array(J.detach())
-        R = np.array(R.detach())
-        G = np.array(G.detach())
-        grad_H = np.array(grad_H.detach())
+            J = np.array(J.detach())
+            R = np.array(R.detach())
+            G = np.array(G.detach())
+            grad_H = np.array(grad_H.detach())
 
-        if G_true.shape[1] == 1:
-            G_true = np.concatenate([G_true] * G.shape[-1], -1)
-        if R_true.shape[1] == 1:
-            R_true = np.concatenate([R_true] * R.shape[-1], -1)
-        if J_true.shape[1] == 1:
-            J_true = np.concatenate([J_true] * J.shape[-1], -1)
+            if G_true.shape[1] == 1:
+                G_true = np.concatenate([G_true] * G.shape[-1], -1)
+            if R_true.shape[1] == 1:
+                R_true = np.concatenate([R_true] * R.shape[-1], -1)
+            if J_true.shape[1] == 1:
+                J_true = np.concatenate([J_true] * J.shape[-1], -1)
 
-        scatter(grad_H, grad_H_true, "grad_H")
-        scatter(G, G_true, "G")
-        scatter(R, R_true, "R")
-        scatter(J, J_true, "S")"""
+            scatter(grad_H, grad_H_true, "grad_H")
+            scatter(G, G_true, "G")
+            scatter(R, R_true, "R")
+            scatter(J, J_true, "S")
