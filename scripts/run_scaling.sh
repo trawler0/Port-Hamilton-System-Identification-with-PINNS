@@ -5,7 +5,7 @@ name=$1
 for trajectories in 1 3 10 30 100; do
   # Determine the walltime based on the trajectories value.
   if [ "$trajectories" -eq 1 ]; then
-    time_str="00:30:00"
+    time_str="01:00:00"
   elif [ "$trajectories" -eq 3 ]; then
     time_str="03:00:00"
   elif [ "$trajectories" -eq 10 ]; then

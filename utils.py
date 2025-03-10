@@ -129,6 +129,23 @@ def compute_metrics(model, trajectories, dt, X, u, xdot, y):
         output_mae_rel = normalized_mae(y_pred, y).item()
         output_mse_rel = normalized_mse(y_pred, y).item()
 
+        X = np.stack([t[0] for t in trajectories])
+        u = np.stack([t[1] for t in trajectories])
+        y = np.stack([t[2] for t in trajectories])
+        signal = [t[3] for t in trajectories]
+        X_pred = forecast(model, X[:, 0], u, dt, signal, X.shape[1])
+        y_pred = torch.stack([model(xi, ui)[1] for (xi, ui) in zip(torch.tensor(X_pred), torch.tensor(u))])
+        y_pred = y_pred.detach().cpu().numpy()
+
+        mu, sigma = np.mean(y, axis=(0, 1), keepdims=True), np.std(y, axis=(0, 1), keepdims=True)
+        y = (y - mu) / sigma
+        y_pred = (y_pred - mu) / sigma
+        margin = .05
+        error = np.max(np.abs(y - y_pred), axis=-1)
+        print(error[0])
+        first = np.argmin((error > margin).astype(float), axis=1)
+        print(first)
+
         out_dict = {
             "mae": mae,
             "mse": mse,

@@ -13,9 +13,9 @@ import random
 from sklearn.preprocessing import StandardScaler
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--name", type=str, default="ball")
+parser.add_argument("--name", type=str, default="spring")
 parser.add_argument("--num_trajectories", type=int, default=100)
-parser.add_argument("--num_val_trajectories", type=int, default=100)
+parser.add_argument("--num_val_trajectories", type=int, default=1000)
 parser.add_argument("--hidden_dim", type=int, default=32)
 parser.add_argument("--depth", type=int, default=3)
 parser.add_argument("--J", type=str, default="default")
@@ -25,11 +25,11 @@ parser.add_argument("--output-weight", type=float, default=.25)
 parser.add_argument("--excitation", type=str, default="mlp")
 parser.add_argument("--grad_H", type=str, default="gradient")
 parser.add_argument("--time", type=float, default=10)
-parser.add_argument("--val_time", type=float, default=100)
+parser.add_argument("--val_time", type=float, default=10)
 parser.add_argument("--steps", type=int, default=None)
 parser.add_argument("--val_steps", type=int, default=None)
 parser.add_argument("--lr", type=float, default=1e-3)
-parser.add_argument("--epochs", type=int, default=500)
+parser.add_argument("--epochs", type=int, default=10)
 parser.add_argument("--criterion", type=str, default="normalized_mse")
 parser.add_argument("--batch_size", type=int, default=256)
 parser.add_argument("--seed", type=int, default=1)
@@ -177,7 +177,7 @@ with mlflow.start_run(run_name=args.run_name, experiment_id=experiment_id):
     metrics = compute_metrics(models, trajectories_val, dt, X_val, u_val, xdot_val, y_val)
     print(metrics)
 
-    if not args.not_forecast:
+    if not args.no_forecast:
         steps = args.forecast_steps
         time = args.forecast_time
         dt = time / steps
