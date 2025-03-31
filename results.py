@@ -7,7 +7,8 @@ from utils import sample_initial_states
 import torch
 from scipy.optimize import curve_fit
 
-# test
+# test test
+print("Creating results")
 
 if not os.path.exists("results"):
     os.makedirs("results")
@@ -730,6 +731,77 @@ def dimension_scaling_law(name, method="default", metric="accurate_Time"):
     # plt.show()
     plt.savefig(os.path.join("results", f"dimension_scaling_{method}_{name}_{metric}.png"))
 
+def export_runs():
+    mn = [
+        ("spring_multi_mass", "spring_chain"),
+        ("spring_multi_mass", "default"),
+        ("spring_multi_mass", "baseline"),
+        ("ball", "affine"),
+        ("ball", "default"),
+        ("motor", "baseline"),
+        ("motor", "affine"),
+        ("spring", "default"),
+        ("spring", "affine"),
+        ("spring", "baseline")
+    ]
+    out = {}
+    for name, method in mn:
+        print("Creating plots for", name, method)
+        experiment = mlflow.get_experiment_by_name(f"scaling_{method}_{name}")
+        runs = mlflow.search_runs(experiment.experiment_id)
+
+        compute_ = []
+        traj_val = []
+        mae_rel_ = []
+        sizes = []
+        acc_ = []
+
+        try:
+            for i, run in runs.iterrows():
+                try:
+                    run_id = run["run_id"]
+                    run_data = mlflow.get_run(run_id)
+                    params = run_data.data.params
+                    metrics = run_data.data.metrics
+
+                    epochs = float(params["epochs"])
+                    trajectories = float(params["num_trajectories"])
+                    compute = epochs * trajectories
+                    hidden_dim = float(params["hidden_dim"])
+                    mae_rel = float(metrics["mae_rel"])
+
+                    compute_.append(compute)
+                    traj_val.append(trajectories)
+                    mae_rel_.append(mae_rel)
+                    sizes.append(hidden_dim)
+                    artifacts_path = mlflow.artifacts.download_artifacts(run_id=run_id)
+                    for root, _, files in os.walk(artifacts_path):
+                        for file in files:
+                            artifact_file_path = os.path.join(root, file)
+                            if artifact_file_path.endswith("accurate_time.npy"):
+                                accurate_time = np.load(artifact_file_path)
+                                accurate_time = np.mean(accurate_time, axis=0) / 100  # np.exp(np.mean(np.log(accurate_time / 100), axis=0))[0]
+                                acc_.append(accurate_time)
+                except Exception as e:
+                    # Optionally log the error for debugging:
+                    # print(f"Error processing run {run_id}: {e}")
+                    pass
+            compute_ = np.array(compute_)
+            traj_val = np.stack(traj_val)
+            mae_rel_ = np.array(mae_rel_)
+            sizes = np.array(sizes)
+            acc_ = np.stack(acc_)
+
+            out[f"mae_{method}_{name}"] = mae_rel_
+            out[f"acc_{method}_{name}"] = acc_
+            out[f"compute_{method}_{name}"] = compute_
+            out[f"traj_{method}_{name}"] = traj_val
+            out[f"sizes_{method}_{name}"] = sizes
+        except Exception as e:
+            print(f"Error processing {method}_{name}: {e}")
+
+    np.save("results.npy", out)
+
 
 """noise()
 plot_scaling("ball")
@@ -747,7 +819,7 @@ compute_scaling_law("ball", "baseline")
 data_scaling_law("ball", "baseline")
 dimension_scaling_law("ball", "baseline")"""
 
-name = "spring_multi_mass"
+"""name = "spring_multi_mass"
 for metric in ["normalized_MAE", "accurate_Time"]:
     for method in ["spring_chain", "default", "baseline"]:
         print("Creating plots for", name, method, metric)
@@ -789,5 +861,6 @@ for metric in ["normalized_MAE", "accurate_Time"]:
         print("Data scaling law")
         data_scaling_law(name, method, metric)
         print("Dimension scaling law")
-        dimension_scaling_law(name, method, metric)
+        dimension_scaling_law(name, method, metric)"""
 
+export_runs()

@@ -15,5 +15,7 @@ module unload Anaconda3/2022.05
 # Load Necessary Modules.
 module load 2022a GCCcore/11.3.0 Python/3.10.4
 
+echo "Running on $(hostname)"
+
 # --- Run Parallel Jobs ---
 srun python results.py
