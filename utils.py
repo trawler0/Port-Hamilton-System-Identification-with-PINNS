@@ -94,7 +94,7 @@ def normalized_mae(x, target):
     return ((x - target) / (std + 1e-6)).abs().mean()
 
 @torch.no_grad()
-def compute_metrics(model, trajectories, dt, X, u, xdot, y):
+def compute_metrics(model, trajectories, dt, X, u, xdot, y, bounds=np.reshape(np.array([.001, .005, .01, .025, .05]), (1, 1, 5))):
 
     if isinstance(model, list):
         out_dict = {}
@@ -129,23 +129,6 @@ def compute_metrics(model, trajectories, dt, X, u, xdot, y):
         output_mae_rel = normalized_mae(y_pred, y).item()
         output_mse_rel = normalized_mse(y_pred, y).item()
 
-        X = np.stack([t[0] for t in trajectories])
-        u = np.stack([t[1] for t in trajectories])
-        y = np.stack([t[2] for t in trajectories])
-        signal = [t[3] for t in trajectories]
-        X_pred = forecast(model, X[:, 0], u, dt, signal, X.shape[1])
-        y_pred = torch.stack([model(xi, ui)[1] for (xi, ui) in zip(torch.tensor(X_pred), torch.tensor(u))])
-        y_pred = y_pred.detach().cpu().numpy()
-
-        mu, sigma = np.mean(y, axis=(0, 1), keepdims=True), np.std(y, axis=(0, 1), keepdims=True)
-        y = (y - mu) / sigma
-        y_pred = (y_pred - mu) / sigma
-        margin = .05
-        error = np.max(np.abs(y - y_pred), axis=-1)
-        print(error[0])
-        first = np.argmin((error > margin).astype(float), axis=1)
-        print(first)
-
         out_dict = {
             "mae": mae,
             "mse": mse,
@@ -156,7 +139,7 @@ def compute_metrics(model, trajectories, dt, X, u, xdot, y):
             "output_mae_rel": output_mae_rel,
             "output_mse_rel": output_mse_rel
         }
-        """X, u, y, signal = np.stack([t[0] for t in trajectories]), np.stack([t[1] for t in trajectories]), np.stack(
+        X, u, y, signal = np.stack([t[0] for t in trajectories]), np.stack([t[1] for t in trajectories]), np.stack(
             [t[2] for t in trajectories]), [t[3] for t in trajectories]
         X0 = X[:, 0]
         X_pred = forecast(model, X0, u, dt, signal, X.shape[1]).detach().numpy()
@@ -167,7 +150,20 @@ def compute_metrics(model, trajectories, dt, X, u, xdot, y):
         out_dict["forecast_mae"] = forecast_mae
         out_dict["forecast_mse"] = forecast_mse
         out_dict["forecast_mae_rel"] = forecast_mae_rel
-        out_dict["forecast_mse_rel"] = forecast_mse_rel"""
+        out_dict["forecast_mse_rel"] = forecast_mse_rel
+        mean, sigma = np.mean(X, axis=-1, keepdims=True), np.std(X, axis=-1, keepdims=True)
+        X = (X - mean) / sigma
+        X_pred = (X_pred - mean) / sigma
+        B, L, D = X.shape
+        inf = np.ones((B, 1, D)) * 100
+        zeros = np.zeros((B, 1, D))
+        X = np.concatenate([X, inf], 1)
+        X_pred = np.concatenate([X_pred, zeros], 1)
+
+        accurate_time = np.argmax((np.expand_dims(np.abs(X - X_pred).mean(-1), -1) > bounds).astype(float), axis=1)
+        tmpdir = tempfile.TemporaryDirectory()
+        np.save(os.path.join(tmpdir.name, "accurate_time.npy"), accurate_time)
+        mlflow.log_artifact(os.path.join(tmpdir.name, "accurate_time.npy"))
 
         if mlflow.active_run() is not None:
             mlflow.log_metrics(out_dict)

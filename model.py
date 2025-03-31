@@ -180,6 +180,42 @@ class JDefault(nn.Module):
         J = J_ - J_.permute(0, 2, 1)
         return J.permute(0, 2, 1)
 
+class JSpringChain(nn.Module):
+
+    def __init__(
+            self,
+            input_dim,
+            hidden_dim,
+            depth,
+            arch="mlp"
+    ):
+        super().__init__()
+        if arch == "mlp":
+            self.J_ = MLP(input_dim, hidden_dim, ((input_dim - 1) * input_dim) // 2, depth)
+        elif arch == "kan":
+            self.J_ = KAN([input_dim] + [hidden_dim] * depth + [((input_dim - 1) * input_dim) // 2])
+        self.vsu = VTU(input_dim, strict=True)
+        N = input_dim // 2
+        mask = torch.zeros(2*N, 2*N)
+        for i in range(N):
+            for j in range(N):
+                if math.fabs(i-j) <= 1:
+                    mask[2*i:2*i+2, 2*j:2*j+2] = 1
+        self.register_buffer("mask", mask.unsqueeze(0))
+
+
+    def forward(self, x, grad_H):
+        J_ = self.vsu(self.J_(x))
+        J = J_ - J_.permute(0, 2, 1)
+        J = J * self.mask
+        return (grad_H.unsqueeze(1) @ J).squeeze(1)
+
+    def reparam(self, x):
+        J_ = self.vsu(self.J_(x))
+        J = J_ - J_.permute(0, 2, 1)
+        J = J * self.mask.transpose(1, 2)
+        return J.permute(0, 2, 1)
+
 
 class RDefault(nn.Module):
 
@@ -209,6 +245,40 @@ class RDefault(nn.Module):
         R = R_ @ R_.permute(0, 2, 1) / math.sqrt(d)
         return R
 
+class RSpringChain(nn.Module):
+
+    def __init__(
+            self,
+            input_dim,
+            hidden_dim,
+            depth,
+            arch="mlp"
+    ):
+        super().__init__()
+        if arch == "mlp":
+            self.R_ = MLP(input_dim, hidden_dim, input_dim ** 2, depth)
+        elif arch == "kan":
+            self.R_ = KAN([input_dim] + [hidden_dim] * depth + [input_dim ** 2])
+        N = input_dim // 2
+        mask = torch.zeros(2*N, 2*N)
+        for i in range(N):
+            mask[2*i:2*i+2, 2*i:2*i+2] = 1
+
+        self.register_buffer("mask", mask.unsqueeze(0))
+
+    def forward(self, x, grad_H):
+        R_ = self.R_(x)
+        d = int(math.sqrt(R_.size(-1)))
+        R_ = R_.view(R_.size(0), d, d)
+        return (grad_H.unsqueeze(1) @ (R_ @ R_.permute(0, 2, 1) * self.mask)).squeeze(1) / math.sqrt(d)
+
+    def reparam(self, x):
+        R_ = self.R_(x)
+        d = int(math.sqrt(R_.size(-1)))
+        R_ = R_.view(R_.size(0), d, d)
+        R = R_ @ R_.permute(0, 2, 1) / math.sqrt(d)
+        R = R * self.mask.transpose(1, 2)
+        return R
 
 class Grad_H(nn.Module):
 
@@ -231,6 +301,33 @@ class Grad_H(nn.Module):
                 retain_graph=True,
             )[0]
         return grad_H
+
+class Grad_HSpringChain(nn.Module):
+
+    def __init__(self, input_dim, hidden_dim, depth):
+        super().__init__()
+        self.H1 = Grad_H(2, hidden_dim, depth)
+        self.H2 = Grad_H(2, hidden_dim, depth)
+        self.H3 = Grad_H(2, hidden_dim, depth)
+        self.H4 = Grad_H(2, hidden_dim, depth)
+        self.H5 = Grad_H(2, hidden_dim, depth)
+        self.H6 = Grad_H(2, hidden_dim, depth)
+        self.H7 = Grad_H(2, hidden_dim, depth)
+        self.H8 = Grad_H(2, hidden_dim, depth)
+
+
+    def forward(self, x):
+        x = torch.cat([
+            self.H1(x[:, 0:2]),
+            self.H2(x[:, 2:4]),
+            self.H3(x[:, 4:6]),
+            self.H4(x[:, 6:8]),
+            self.H5(x[:, 8:10]),
+            self.H6(x[:, 10:12]),
+            self.H7(x[:, 12:14]),
+            self.H8(x[:, 14:16]),
+        ], 1)
+        return x
 
 # just for the spring
 class RQuadratic(nn.Module):
@@ -335,6 +432,24 @@ class R_Sigmoid(nn.Module):
         R = R_ @ sigma @ R_.permute(0, 2, 1)
         return R
 
+class GSpringChain(nn.Module):
+
+    def __init__(self, input_dim, hidden_dim, depth):
+        super().__init__()
+        self.G = MLP(input_dim, hidden_dim, input_dim**2 // 2, depth)
+        mask = torch.zeros(input_dim, input_dim//2)
+        for i in range(input_dim//2):
+            mask[2*i:2*i+2, i:i+1] = 1
+        self.register_buffer("mask", mask.view(1, -1))
+        self.N = input_dim // 2
+
+    def forward(self, x):
+        G = self.G(x)
+        G = G * self.mask
+
+        return G
+
+
 class PHNNModel(nn.Module):
 
     def __init__(self, input_dim, hidden_dim, depth, J="default", R="default", grad_H="gradient", G="mlp", excitation="mlp",
@@ -350,6 +465,8 @@ class PHNNModel(nn.Module):
             self.J = J_Sigmoid(input_dim, hidden_dim, excitation)
         elif J == "spring":
             self.J = JSpring()
+        elif J == "spring_chain":
+            self.J = JSpringChain(input_dim, hidden_dim, depth)
         else:
             raise ValueError("Unknown J")
 
@@ -363,6 +480,8 @@ class PHNNModel(nn.Module):
             self.R = R_Sigmoid(input_dim, hidden_dim, excitation)
         elif R == "default_kan":
             self.R = RDefault(input_dim, hidden_dim, depth, arch="kan")
+        elif R == "spring_chain":
+            self.R = RSpringChain(input_dim, hidden_dim, depth)
         else:
             raise ValueError("Unknown R")
 
@@ -372,6 +491,8 @@ class PHNNModel(nn.Module):
             self.grad_H = Grad_H(input_dim, hidden_dim, depth, arch="kan")
         elif grad_H == "linear":
             self.grad_H = Grad_HLinear(input_dim)
+        elif grad_H == "spring_chain":
+            self.grad_H = Grad_HSpringChain(input_dim, hidden_dim, depth)
         else:
             raise ValueError("Unknown grad_H")
 
@@ -381,6 +502,8 @@ class PHNNModel(nn.Module):
             self.G = KAN([input_dim] + [hidden_dim] * depth + [input_dim * u_dim])
         elif G == "linear":
             self.G = GLinear(input_dim * u_dim)
+        elif G == "spring_chain":
+            self.G = GSpringChain(input_dim, hidden_dim, depth)
         else:
             raise ValueError("Unknown G")
 
@@ -409,11 +532,8 @@ class PHNNModel(nn.Module):
 
 
 if __name__ == "__main__":
-    model = PHNNModel(4, 4, 3, u_dim=2)
-    x = torch.randn(256, 4)
-    u = torch.randn(256, 2)
-    print(sum(p.numel() for p in model.parameters()))
-    print(model(x, u)[0].shape, model(x, u)[1].shape)
-    model = InputAffine(4, 4, 2, 3)
+    model = PHNNModel(16, 16, 3, u_dim=8, J="spring_chain", R="spring_chain", grad_H="spring_chain", G="spring_chain")
+    x = torch.randn(256, 16)
+    u = torch.randn(256, 8)
     print(sum(p.numel() for p in model.parameters()))
     print(model(x, u)[0].shape, model(x, u)[1].shape)

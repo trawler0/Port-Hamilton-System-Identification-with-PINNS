@@ -7,8 +7,7 @@ from utils import sample_initial_states
 import torch
 from scipy.optimize import curve_fit
 
-
-#plt.style.use('seaborn-darkgrid')  # You can choose other styles like 'ggplot', 'classic', etc.
+# test
 
 if not os.path.exists("results"):
     os.makedirs("results")
@@ -81,7 +80,6 @@ def plot_scaling(name):
     mae_rel_default = [default[k][0] for k in sorted_keys]
     mae_rel_prior = [prior[k][0] for k in sorted_keys]
 
-
     # Create the figure and axis with an optimized size
     fig, ax = plt.subplots(figsize=(12, 8))  # Adjusted from (30, 30) to (12, 8)
 
@@ -96,7 +94,7 @@ def plot_scaling(name):
 
     # Set title and labels with increased font sizes
     ax.set_xlabel("Number of Trajectories Used for Training", fontsize=16)
-    ax.set_ylabel("Normalized MAE", fontsize=16)  # Added y-label for completeness
+    ax.set_ylabel("Normalized_MAE", fontsize=16)  # Added y-label for completeness
 
     # Customize tick parameters for better readability
     ax.tick_params(axis='both', which='major', labelsize=14)
@@ -139,7 +137,8 @@ def recipe():
     state = 3
     fig, ax = plt.subplots(1, 1, figsize=(30, 15))
     time = np.arange(len(X_true[idx, :10000, state])) * 0.01
-    ax.plot(time, X_true[idx, :10000, state], label="True", color=colors["True"], linestyle=line_styles["True"], linewidth=thickness["True"])
+    ax.plot(time, X_true[idx, :10000, state], label="True", color=colors["True"], linestyle=line_styles["True"],
+            linewidth=thickness["True"])
     for run_name, X_pred in preds.items():
         def rename(name):
             if name == "shallow":
@@ -148,7 +147,9 @@ def recipe():
                 return "pH shorter"
             elif name == "default":
                 return "pH default"
-        ax.plot(time, X_pred[idx, :10000, state], label=rename(run_name), color=colors[run_name], linestyle=line_styles[run_name], linewidth=thickness[run_name])
+
+        ax.plot(time, X_pred[idx, :10000, state], label=rename(run_name), color=colors[run_name],
+                linestyle=line_styles[run_name], linewidth=thickness[run_name])
     ax.axvline(x=10., color='purple', linestyle='--', linewidth=2)
     ax.grid()
     ax.axvspan(
@@ -164,6 +165,7 @@ def recipe():
     ax.legend(fontsize=32)
     #plt.show()
     plt.savefig(os.path.join("results", "recipe.png"))
+
 
 def compare():
     experiment = mlflow.get_experiment_by_name("compare")
@@ -192,7 +194,8 @@ def compare():
     ax.set_xlabel("Time [s]", fontsize=32)
     ax.set_ylabel("Momentum $x_2$", fontsize=32)
     t = np.arange(1500) * 0.01
-    ax.plot(t, X_true[idx, :1500, state], label="True", color=colors["True"], linestyle=line_styles["True"], linewidth=thickness["True"])
+    ax.plot(t, X_true[idx, :1500, state], label="True", color=colors["True"], linestyle=line_styles["True"],
+            linewidth=thickness["True"])
     for run_name, X_pred in preds.items():
         def rename(name):
             if name == "prior":
@@ -201,7 +204,9 @@ def compare():
                 return "pH"
             elif name == "baseline":
                 return "Baseline"
-        ax.plot(t, X_pred[idx, :1500, state], label=rename(run_name), color=colors[run_name], linestyle=line_styles[run_name], linewidth=thickness[run_name])
+
+        ax.plot(t, X_pred[idx, :1500, state], label=rename(run_name), color=colors[run_name],
+                linestyle=line_styles[run_name], linewidth=thickness[run_name])
     ax.axvline(x=10., color='purple', linestyle='--', linewidth=2)
     ax.tick_params(axis='both', which='major', labelsize=32)
     ax.axvspan(
@@ -263,6 +268,7 @@ def prior_vs_default():
                 return "pH"
             elif name == "prior":
                 return "pH prior"
+
         idx = 3
         ax.scatter(grad_H[:, idx], H_pred[:, idx], label=rename(run_name), color=colors[run_name])
         correlation = np.corrcoef(grad_H[:, idx], H_pred[:, idx])[0, 1]
@@ -287,6 +293,7 @@ def prior_vs_default():
 
     plt.savefig(os.path.join("results", "compare_R.png"))
     #plt.show()
+
 
 def prior_vs_default_motor():
     experiment = mlflow.get_experiment_by_name("scaling_motor")
@@ -336,8 +343,10 @@ def prior_vs_default_motor():
                 return "pH"
             elif name == "motor_prior_100":
                 return "pH prior"
+
         idx = 0
-        ax.scatter(grad_H[:, idx], H_pred[:, idx], label=rename(run_name), color=colors["default" if run_name == "motor_default_100" else "prior"])
+        ax.scatter(grad_H[:, idx], H_pred[:, idx], label=rename(run_name),
+                   color=colors["default" if run_name == "motor_default_100" else "prior"])
         correlation = np.corrcoef(grad_H[:, idx], H_pred[:, idx])[0, 1]
         print(f"Correlation for {run_name}: {correlation}")
     ax.set_ylabel(r"Identified $\frac{\partial H(x)}{\partial x_1}$", fontsize=64)
@@ -350,7 +359,8 @@ def prior_vs_default_motor():
     for run_name, S_pred in S_preds.items():
         idx1 = 2
         idx2 = 0
-        ax.scatter(S[:, idx1, idx2], S_pred[:, idx1, idx2], label=rename(run_name), color=colors["default" if run_name == "motor_default_100" else "prior"])
+        ax.scatter(S[:, idx1, idx2], S_pred[:, idx1, idx2], label=rename(run_name),
+                   color=colors["default" if run_name == "motor_default_100" else "prior"])
         correlation = np.corrcoef(S[:, idx1, idx2], S_pred[:, idx1, idx2])[0, 1]
         print(f"Correlation for {run_name}: {correlation}")
     ax.set_ylabel(r"Identified $S_{13}(x)$", fontsize=64)
@@ -360,6 +370,7 @@ def prior_vs_default_motor():
 
     plt.savefig(os.path.join("results", "compare_J_motor.png"))
     #plt.show()
+
 
 def prior_comparison():
     experiment = mlflow.get_experiment_by_name("prior_comparison")
@@ -397,16 +408,16 @@ def prior_comparison():
         mae_rel_quadratic = [quadratic[k][0] for k in sorted_keys]
         mae_rel_default = [default[k][0] for k in sorted_keys]
 
-
         # Create the figure and axis with an optimized size
         fig, ax = plt.subplots(figsize=(12, 8))  # Adjusted from (30, 30) to (12, 8)
 
         # Plotting the data with markers and increased line width for better visibility
-        ax.plot(sorted_keys, mae_rel_wrong, label="pH fully linear prior", marker='o', linestyle=":", color=colors["wrong"])
+        ax.plot(sorted_keys, mae_rel_wrong, label="pH fully linear prior", marker='o', linestyle=":",
+                color=colors["wrong"])
         ax.plot(sorted_keys, mae_rel_default, label="pH", marker='s', linestyle=":", color=colors["default"])
         ax.plot(sorted_keys, mae_rel_generic, label="pH MLP prior", marker='^', linestyle=":", color=colors["prior"])
-        ax.plot(sorted_keys, mae_rel_quadratic, label="pH quadratic prior", marker='v', linestyle=":", color=colors["quadratic"])
-
+        ax.plot(sorted_keys, mae_rel_quadratic, label="pH quadratic prior", marker='v', linestyle=":",
+                color=colors["quadratic"])
 
         # Set log scales
         ax.set_xscale("log")
@@ -414,7 +425,7 @@ def prior_comparison():
 
         # Set title and labels with increased font sizes
         ax.set_xlabel("Number of Trajectories Used for Training", fontsize=16)
-        ax.set_ylabel("Normalized MAE", fontsize=16)  # Added y-label for completeness
+        ax.set_ylabel("Normalized_MAE", fontsize=16)  # Added y-label for completeness
 
         # Customize tick parameters for better readability
         ax.tick_params(axis='both', which='major', labelsize=14)
@@ -431,7 +442,6 @@ def prior_comparison():
         #plt.show()
 
         plt.savefig(os.path.join("results", f"{name}_prior_comparison.png"))
-
 
 
 def noise():
@@ -463,10 +473,12 @@ def noise():
     ax.tick_params(axis='both', which='major', labelsize=32)
     N = 4000
     t = np.arange(N) * 0.01
-    ax.plot(t, X_true[idx, :N, state], label="True", color=colors["True"], linestyle=line_styles["True"], linewidth=thickness["True"])
+    ax.plot(t, X_true[idx, :N, state], label="True", color=colors["True"], linestyle=line_styles["True"],
+            linewidth=thickness["True"])
     for run_name in ["noise25", "noise30", "no_noise"]:
         X_pred = preds[run_name]
         print(run_name)
+
         def rename(name):
             if name == "noise20":
                 return "20 dB"
@@ -476,7 +488,9 @@ def noise():
                 return "30 dB"
             elif name == "no_noise":
                 return "No noise"
-        ax.plot(t, X_pred[idx, :N, state], label=rename(run_name), color=colors[run_name], linestyle=line_styles[run_name], linewidth=thickness[run_name])
+
+        ax.plot(t, X_pred[idx, :N, state], label=rename(run_name), color=colors[run_name],
+                linestyle=line_styles[run_name], linewidth=thickness[run_name])
     # Add shaded area and vertical line if N >= 1000
     if N >= 1000:
         # Define the shading range around x=10
@@ -505,14 +519,15 @@ def noise():
     plt.savefig(os.path.join("results", f"noise_{N}.png"))
 
 
-def data_scaling_law(name, method="default"):
-    experiment = mlflow.get_experiment_by_name(f"scaling_initial_{method}_{name}")
+def data_scaling_law(name, method="default", metric="accurate_Time"):
+    experiment = mlflow.get_experiment_by_name(f"scaling_{method}_{name}")
     runs = mlflow.search_runs(experiment.experiment_id)
 
     compute_ = []
     traj_val = []
     mae_rel_ = []
     sizes = []
+    acc_ = []
 
     for i, run in runs.iterrows():
         try:
@@ -531,6 +546,15 @@ def data_scaling_law(name, method="default"):
             traj_val.append(trajectories)
             mae_rel_.append(mae_rel)
             sizes.append(hidden_dim)
+            artifacts_path = mlflow.artifacts.download_artifacts(run_id=run_id)
+            for root, _, files in os.walk(artifacts_path):
+                for file in files:
+                    artifact_file_path = os.path.join(root, file)
+                    if artifact_file_path.endswith("accurate_time.npy"):
+                        accurate_time = np.load(artifact_file_path)
+                        accurate_time = np.mean(accurate_time, axis=0)[
+                                            2] / 100  # np.exp(np.mean(np.log(accurate_time / 100), axis=0))[0]
+                        acc_.append(accurate_time)
         except Exception as e:
             # Optionally log the error for debugging:
             # print(f"Error processing run {run_id}: {e}")
@@ -539,19 +563,21 @@ def data_scaling_law(name, method="default"):
     # Convert lists to numpy arrays for convenience
     compute_ = np.array(compute_)
     traj_val = np.array(traj_val)
-    mae_rel_ = np.array(mae_rel_)
+    if metric == "normalized_MAE":
+        mae_rel_ = np.array(mae_rel_)
+    elif metric == "accurate_Time":
+        mae_rel_ = np.array(acc_)
     sizes = 4 * np.array(sizes)
-
 
     # Create scatter plot: x = trajectories, y = mae_rel, color by compute_
     plt.figure(figsize=(8, 6))
-    scatter = plt.scatter(traj_val, mae_rel_, c=np.log(compute_), cmap='coolwarm', edgecolor='k', s=sizes)
+    scatter = plt.scatter(traj_val, mae_rel_, c=np.log10(compute_), cmap='coolwarm', edgecolor='k', s=sizes)
 
     plt.xscale('log')
     plt.yscale('log')
     plt.xlabel("Number of Trajectories (log scale)")
-    plt.ylabel("MAE Relative (log scale)")
-    plt.title("Scaling Law: MAE Relative vs. Number of Trajectories")
+    plt.ylabel(f"{metric} Relative (log scale)")
+    plt.title(f"Scaling Law: {metric} Relative vs. Number of Trajectories")
 
     # Create a colorbar to show mapping of compute value to color.
     cbar = plt.colorbar(scatter)
@@ -559,17 +585,18 @@ def data_scaling_law(name, method="default"):
 
     plt.grid(True, which="both", ls="--", lw=0.5)
     # plt.show()
-    plt.savefig(os.path.join("results", f"data_scaling_{method}_{name}.png"))
+    plt.savefig(os.path.join("results", f"data_scaling_{method}_{name}_{metric}.png"))
 
 
-def compute_scaling_law(name, method="default"):
-    experiment = mlflow.get_experiment_by_name(f"scaling_initial_{method}_{name}")
+def compute_scaling_law(name, method="default", metric="accurate_Time"):
+    experiment = mlflow.get_experiment_by_name(f"scaling_{method}_{name}")
     runs = mlflow.search_runs(experiment.experiment_id)
 
     compute_ = []
     traj_val = []
     mae_rel_ = []
     sizes = []
+    acc_ = []
 
     for i, run in runs.iterrows():
         try:
@@ -589,6 +616,16 @@ def compute_scaling_law(name, method="default"):
             traj_val.append(trajectories)
             mae_rel_.append(mae_rel)
             sizes.append(hidden_dim)
+            artifacts_path = mlflow.artifacts.download_artifacts(run_id=run_id)
+            for root, _, files in os.walk(artifacts_path):
+                for file in files:
+                    artifact_file_path = os.path.join(root, file)
+                    if artifact_file_path.endswith("accurate_time.npy"):
+                        accurate_time = np.load(artifact_file_path)
+                        accurate_time = np.mean(accurate_time, axis=0)[
+                                            2] / 100  # np.exp(np.mean(np.log(accurate_time / 100), axis=0))[0]
+                        acc_.append(accurate_time)
+
         except Exception as e:
             # Optionally log the error for debugging:
             # print(f"Error processing run {run_id}: {e}")
@@ -597,18 +634,21 @@ def compute_scaling_law(name, method="default"):
     # Convert lists to numpy arrays for convenience
     compute_ = np.array(compute_)
     traj_val = np.array(traj_val)
-    mae_rel_ = np.array(mae_rel_)
+    if metric == "normalized_MAE":
+        mae_rel_ = np.array(mae_rel_)
+    elif metric == "accurate_Time":
+        mae_rel_ = np.array(acc_)
     sizes = 4 * np.array(sizes)
 
     # Create scatter plot: x = compute, y = mae_rel, color by trajectories (more red = more trajectories)
     plt.figure(figsize=(8, 6))
-    scatter = plt.scatter(compute_, mae_rel_, c=np.log(traj_val), cmap='coolwarm', edgecolor='k', s=sizes)
+    scatter = plt.scatter(compute_, mae_rel_, c=np.log10(traj_val), cmap='coolwarm', edgecolor='k', s=sizes)
 
     plt.xscale('log')
     plt.yscale('log')
     plt.xlabel("Compute (epochs * num_trajectories, log scale)")
-    plt.ylabel("MAE Relative (log scale)")
-    plt.title("Scaling Law: MAE Relative vs. Compute")
+    plt.ylabel(f"{metric} (log scale)")
+    plt.title(f"Scaling Law: {metric} vs. Compute")
 
     # Create a colorbar to show mapping of trajectories to color intensity.
     cbar = plt.colorbar(scatter)
@@ -616,16 +656,18 @@ def compute_scaling_law(name, method="default"):
 
     plt.grid(True, which="both", ls="--", lw=0.5)
     # plt.show()
-    plt.savefig(os.path.join("results", f"compute_scaling_{method}_{name}.png"))
+    plt.savefig(os.path.join("results", f"compute_scaling_{method}_{name}_{metric}.png"))
 
-def dimension_scaling_law(name, method="default"):
-    experiment = mlflow.get_experiment_by_name(f"scaling_initial_{method}_{name}")
+
+def dimension_scaling_law(name, method="default", metric="accurate_Time"):
+    experiment = mlflow.get_experiment_by_name(f"scaling_{method}_{name}")
     runs = mlflow.search_runs(experiment.experiment_id)
 
     compute_ = []
     traj_val = []
     mae_rel_ = []
     sizes = []
+    acc_ = []
 
     for i, run in runs.iterrows():
         try:
@@ -633,6 +675,7 @@ def dimension_scaling_law(name, method="default"):
             run_data = mlflow.get_run(run_id)
             params = run_data.data.params
             metrics = run_data.data.metrics
+
 
             epochs = float(params["epochs"])
             trajectories = float(params["num_trajectories"])
@@ -645,6 +688,15 @@ def dimension_scaling_law(name, method="default"):
             traj_val.append(trajectories)
             mae_rel_.append(mae_rel)
             sizes.append(hidden_dim)
+            artifacts_path = mlflow.artifacts.download_artifacts(run_id=run_id)
+            for root, _, files in os.walk(artifacts_path):
+                for file in files:
+                    artifact_file_path = os.path.join(root, file)
+                    if artifact_file_path.endswith("accurate_time.npy"):
+                        accurate_time = np.load(artifact_file_path)
+                        accurate_time = np.mean(accurate_time, axis=0)[
+                                            2] / 100  # np.exp(np.mean(np.log(accurate_time / 100), axis=0))[0]
+                        acc_.append(accurate_time)
         except Exception as e:
             # Optionally log the error for debugging:
             # print(f"Error processing run {run_id}: {e}")
@@ -653,18 +705,22 @@ def dimension_scaling_law(name, method="default"):
     # Convert lists to numpy arrays for convenience
     compute_ = np.array(compute_)
     traj_val = np.array(traj_val)
-    mae_rel_ = np.array(mae_rel_)
+    if metric == "normalized_MAE":
+        mae_rel_ = np.array(mae_rel_)
+    elif metric == "accurate_Time":
+        mae_rel_ = np.array(acc_)
     sizes = 4 * np.array(sizes)
 
     # Create scatter plot: x = compute, y = mae_rel, color by trajectories (more red = more trajectories)
     plt.figure(figsize=(8, 6))
-    scatter = plt.scatter(sizes, mae_rel_, c=np.log(traj_val), cmap='coolwarm', edgecolor='k', s=10 * np.log(compute_))
+    scatter = plt.scatter(sizes, mae_rel_, c=np.log10(traj_val), cmap='coolwarm', edgecolor='k',
+                          s=10 * np.log(compute_))
 
     plt.xscale('log')
     plt.yscale('log')
     plt.xlabel("Hidden Dim, log scale)")
-    plt.ylabel("MAE Relative (log scale)")
-    plt.title("Scaling Law: MAE Relative vs. Compute")
+    plt.ylabel(f"{metric} Relative (log scale)")
+    plt.title(f"Scaling Law: {metric} vs. Compute")
 
     # Create a colorbar to show mapping of trajectories to color intensity.
     cbar = plt.colorbar(scatter)
@@ -672,7 +728,8 @@ def dimension_scaling_law(name, method="default"):
 
     plt.grid(True, which="both", ls="--", lw=0.5)
     # plt.show()
-    plt.savefig(os.path.join("results", f"dimension_scaling_{method}_{name}.png"))
+    plt.savefig(os.path.join("results", f"dimension_scaling_{method}_{name}_{metric}.png"))
+
 
 """noise()
 plot_scaling("ball")
@@ -689,9 +746,48 @@ dimension_scaling_law("ball")
 compute_scaling_law("ball", "baseline")
 data_scaling_law("ball", "baseline")
 dimension_scaling_law("ball", "baseline")"""
-compute_scaling_law("ball", "affine")
-print(1)
-data_scaling_law("ball", "affine")
-print(2)
-dimension_scaling_law("ball", "affine")
-print(3)
+
+name = "spring_multi_mass"
+for metric in ["normalized_MAE", "accurate_Time"]:
+    for method in ["spring_chain", "default", "baseline"]:
+        print("Creating plots for", name, method, metric)
+        print("Compute scaling law")
+        compute_scaling_law(name, method, metric)
+        print("Data scaling law")
+        data_scaling_law(name, method, metric)
+        print("Dimension scaling law")
+        dimension_scaling_law(name, method, metric)
+
+name = "ball"
+for metric in ["normalized_MAE", "accurate_Time"]:
+    for method in ["affine", "default"]:
+        print("Creating plots for", name, method, metric)
+        print("Compute scaling law")
+        compute_scaling_law(name, method, metric)
+        print("Data scaling law")
+        data_scaling_law(name, method, metric)
+        print("Dimension scaling law")
+        dimension_scaling_law(name, method, metric)
+
+name = "motor"
+for metric in ["normalized_MAE", "accurate_Time"]:
+    for method in ["baseline", "affine"]:
+        print("Creating plots for", name, method, metric)
+        print("Compute scaling law")
+        compute_scaling_law(name, method, metric)
+        print("Data scaling law")
+        data_scaling_law(name, method, metric)
+        print("Dimension scaling law")
+        dimension_scaling_law(name, method, metric)
+
+name = "spring"
+for metric in ["normalized_MAE", "accurate_Time"]:
+    for method in ["default", "affine", "baseline"]:
+        print("Creating plots for", name, method, metric)
+        print("Compute scaling law")
+        compute_scaling_law(name, method, metric)
+        print("Data scaling law")
+        data_scaling_law(name, method, metric)
+        print("Dimension scaling law")
+        dimension_scaling_law(name, method, metric)
+

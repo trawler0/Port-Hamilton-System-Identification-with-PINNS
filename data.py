@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.integrate import odeint
+from scipy.integrate import odeint, solve_ivp
 import torch
 from utils import sample_initial_states, multi_sin_signal, get_uniform_white_noise, get_noise_bound
 from functools import partial
@@ -53,7 +53,6 @@ class BaseDataGenerator:
             u_out = np.stack([u(t) for t in t_])
         return odeint(dynamics, x0, t_), u_out, u
 
-
     def get_data(self, X0):
         all_X = []
         all_u = []
@@ -63,6 +62,7 @@ class BaseDataGenerator:
         dt = self.simulation_time / self.num_steps
         trajectories = []
         for j, x0 in enumerate(tqdm(X0)):
+            u = self.generate_signal(seed=j) if self.generate_signal is not None else None
             u = self.generate_signal(seed=j) if self.generate_signal is not None else None
             X, u, signal = self.generate_trajectory(x0, u)
             #xdot = (X[1:] - X[:-1]) / dt      -    this is not any good
@@ -206,6 +206,58 @@ class PMSM(BaseDataGenerator):
     def G(self, x):
         return self.G_
 
+class MultiMassSpringDamper(BaseDataGenerator):
+
+    def __init__(self, N, G_, masses, spring_constants, damping, simulation_time, num_steps, generate_signal=None):
+        """
+        N: number of mass-spring-damper units.
+        masses: array-like of length N containing masses.
+        spring_constants: array-like of length N containing spring constants.
+        damping: scalar damping coefficient or array-like of length N
+        """
+        super().__init__(simulation_time, num_steps, generate_signal)
+        self.N = N
+        self.G_ = G_
+        self.masses = np.asarray(masses)
+        self.spring_constants = np.asarray(spring_constants)
+        self.damping = np.asarray(damping) if hasattr(damping, '__len__') else damping * np.ones(N)
+
+        M_diag = []
+        for i in range(N):
+            M_diag.extend([spring_constants[i] / 2, 1 / (2 * masses[i])])
+        self.M = np.diag(M_diag)
+
+
+    def H(self, x):
+        return x @ self.M @ x / 2
+
+    def grad_H(self, x):
+        return self.M @ x
+
+    def J(self, x):
+        J_matrix = np.zeros((2*self.masses.size, 2*self.masses.size))
+        for i in range(self.masses.size):
+            idx = 2*i
+            J_matrix[idx, idx+1] = 1
+            J_matrix[idx+1, idx] = -1
+            if i != self.masses.size - 1:
+                J_matrix[idx+1, idx+2] = 1
+                J_matrix[idx+2, idx+1] = -1
+        return J_matrix
+
+    def R(self, x):
+        R_matrix = np.zeros((2*self.masses.size, 2*self.masses.size))
+        for i in range(self.masses.size):
+            idx = 2*i + 1
+            R_matrix[idx, idx] = self.damping[i] / self.masses[i]
+        return R_matrix
+
+    def G(self, x):
+        return self.G_
+
+    def u(self, t, *args):
+        return np.zeros(self.G_.shape[1])
+
 
 def simple_experiment(name, simulation_time, num_steps, amplitude, f0, **kwargs):
     if name == "spring":
@@ -237,6 +289,23 @@ def simple_experiment(name, simulation_time, num_steps, amplitude, f0, **kwargs)
             mlflow.log_params({"data_J_m": J_m, "data_L": L, "data_beta": beta, "data_r": r, "data_Phi": Phi})
         get_u = partial(multi_sin_signal, n_signals=2, amplitude=amplitude, f_0=f0)
         return PMSM(J_m, L, beta, r, Phi, G, simulation_time, num_steps, get_u)
+    elif name == "spring_multi_mass":
+        N = kwargs.pop("N", 8)
+        masses = kwargs.pop("masses", [1.0 for _ in range(N)])
+        spring_constants = kwargs.pop("spring_constants", [1.0 for _ in range(N)])
+        damping = kwargs.pop("damping", 0.5)
+
+        G = np.zeros((2 * N, N))
+        for i in range(N):
+            G[2 * i, i] = 1
+
+        if mlflow.active_run():
+            mlflow.log_params(
+                {"data_masses": masses, "data_spring_constants": spring_constants, "data_damping": damping,
+                 "data_G": G})
+
+        get_u = partial(multi_sin_signal, n_signals=N, amplitude=amplitude, f_0=f0)
+        return MultiMassSpringDamper(N, G, masses, spring_constants, damping, simulation_time, num_steps, get_u)
     else:
         raise NotImplementedError("Experiment not implemented")
 
@@ -268,6 +337,15 @@ def dim_bias_scale_sigs(name):
         f0_train = .1
         amplitude_val = 5
         f0_val = .1
+    elif name == "spring_multi_mass":
+        DIM = 2 * 8
+        scale = np.ones(DIM)
+        bias = np.zeros(DIM)
+        sigs = 8
+        amplitude_train = 0.4
+        f0_train = 0.1
+        amplitude_val = 0.4
+        f0_val = 0.1
     else:
         raise ValueError("Unknown problem")
     return DIM, scale, bias, sigs, amplitude_train, f0_train, amplitude_val, f0_val
@@ -275,9 +353,9 @@ def dim_bias_scale_sigs(name):
 if __name__ == "__main__":
     from matplotlib import pyplot as plt
 
-    dim, scale, bias, sigs, amplitude_train, f0_train, amplitude_val, f0_val = dim_bias_scale_sigs("ball")
-    generator = simple_experiment("ball", 20, 1000, amplitude_train, f0_train)
-    X0 = sample_initial_states(20, 3, {"identifies": "uniform", "seed": 41, "scale": scale, "bias": bias})
+    dim, scale, bias, sigs, amplitude_train, f0_train, amplitude_val, f0_val = dim_bias_scale_sigs("spring_multi_mass")
+    generator = simple_experiment("spring_multi_mass", 20, 1000, amplitude_train, f0_train)
+    X0 = sample_initial_states(100, 16, {"identifies": "uniform", "seed": 41, "scale": scale, "bias": bias})
     X, u, xdot, y, trajectories = generator.get_data(X0)
     a = get_noise_bound(u, 5)
 

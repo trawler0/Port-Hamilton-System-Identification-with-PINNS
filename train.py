@@ -30,6 +30,7 @@ class TrainingModule(LightningModule):
 
         X, u, xdot, y = batch
         xdot_hat, y_hat = self.model(X, u)
+
         loss_xdot = self.loss_fn(xdot_hat, xdot)
         loss_y = self.loss_fn(y_hat, y)
         self.log("loss_xdot", loss_xdot, on_step=True, on_epoch=True, prog_bar=True, logger=True)
@@ -90,6 +91,8 @@ if __name__ == "__main__":
     model.validation_step(trajectories, 0)
 
 
-
-
-
+#scaling_spring_chain_spring
+#scaling_spring_chain_spring
+#scaling_spring_chain_spring
+#scaling_spring_chain_spring
+#scaling_default_spring
