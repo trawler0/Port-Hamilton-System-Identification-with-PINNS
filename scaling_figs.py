@@ -17,11 +17,11 @@ mn = [
     ("spring", "baseline")
 ]
 data = data.item()
-method, name = mn[6]
+method, name = mn[2]
 print("Selected:", method, name)
 
 mae = data[f"mae_{name}_{method}"]
-accurate_time = data[f"acc_{name}_{method}"][:, 2]
+accurate_time = data[f"acc_{name}_{method}"][:, 0]
 compute = data[f"compute_{name}_{method}"]
 trajectories = data[f"traj_{name}_{method}"]
 sizes = data[f"sizes_{name}_{method}"]
@@ -49,10 +49,8 @@ def mae_scaling(C_raw, M_raw):
     def scaling_law_log(C, a, b, c, d):
         return np.log10(a + b * (10**C + c)**d)
 
-    C_norm = (C - np.min(C)) / (np.max(C) - np.min(C))
-
-    p0 = [np.mean(10**M), 1.0, 1.0, -1.0]
-    bounds = ([1e-10, 1e-10, 0, -6], [np.inf, np.inf, np.inf, -0.3])  # <- was -0.1
+    p0 = [0, 1.0, 0, -1.0]
+    bounds = ([0, 1e-10, 0, -6], [np.inf, np.inf, np.inf, -0.3])  # <- was -0.1
 
     params, _ = curve_fit(
         scaling_law_log, C, M,
@@ -75,7 +73,7 @@ def acc_scaling(C_raw, A):
 
     def acc_law(C, a, b, c, d, e):
         logistic = a / (1 + b * (10**C + c)**(-d))
-        return np.maximum(0, logistic - e)
+        return np.maximum(0, logistic - e) + np.min(accurate_time)
 
     # Safe initial guesses
     a0 = np.max(A)
@@ -116,7 +114,7 @@ fig, ax = plt.subplots(1, 2, figsize=(15, 15))
 
 # MAE Plot
 C_mae, M_mae, C_fit, M_fit = mae_scaling(compute, mae)
-ax[0].scatter(C_mae, M_mae, label="Envelope", color="blue")
+ax[0].scatter(compute, mae, c=np.log(trajectories), cmap='coolwarm', edgecolor='k', s=sizes**2/16)
 ax[0].plot(C_fit, M_fit, label="MAE Fit", color="black")
 ax[0].set_xscale("log")
 ax[0].set_yscale("log")
