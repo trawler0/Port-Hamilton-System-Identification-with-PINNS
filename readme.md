@@ -1,10 +1,14 @@
 # Nonlinear Port‑Hamiltonian System Identification from Input–State–Output Data
 
-![pipeline](docs/figures/ph-pinns-banner.png)
-
-> **TL;DR** This repository contains the code accompanying the paper **“Non‑linear port‑Hamiltonian system identification from input–state–output data”**.  
-> We learn conserved‑energy models directly from trajectories by combining Physics‑Informed Neural Networks (PINNs) with port‑Hamiltonian (pH) structure.
-
+> A framework for identifying nonlinear port-Hamiltonian systems using input-
+state-output data is introduced. The framework utilizes neural networks’
+universal approximation capacity to effectively represent complex dynamics
+in a structured way. We show that using the structure helps to make long-
+term predictions compared to baselines that do not incorporate physics. We
+also explore different architectures based on MLPs, KANs, and using prior
+information. The technique is validated through examples featuring non-
+linearities in either the skew-symmetric terms, the dissipative terms, or the
+Hamiltonian.
 ---
 
 ## 1. Overview
