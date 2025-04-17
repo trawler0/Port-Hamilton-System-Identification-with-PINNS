@@ -3,37 +3,39 @@
 ![pipeline](docs/figures/ph-pinns-banner.png)
 
 > **TL;DR** This repository contains the code accompanying the paper **“Non‑linear port‑Hamiltonian system identification from input–state–output data”**.  
-> We learn conserved‐energy models directly from trajectories by combining Physics‑Informed Neural Networks (PINNs) with port‑Hamiltonian (pH) structure.
+> We learn conserved‑energy models directly from trajectories by combining Physics‑Informed Neural Networks (PINNs) with port‑Hamiltonian (pH) structure.
 
 ---
 
 ## 1. Overview
-Port‑Hamiltonian (pH) systems provide an energy–based description of multi‑physical processes and obey
+Port‑Hamiltonian (pH) systems provide an energy‑based description of multi‑physical processes and obey
 
-\[\dot x =\bigl(J(x) - R(x)\bigr) \, \nabla_x H(x) + B(x) \, u, \quad y = B^\top(x)\, \nabla_x H(x)\]
+$$
+\dot x = \bigl(J(x) - R(x)\bigr)\, \nabla_x H(x) + B(x)\,u,\qquad y = B^\top(x)\, \nabla_x H(x)
+$$
 
 where
 
-* **state** \(x \in \mathbb R^{n}\)
-* **input** \(u \in \mathbb R^{m}\)
-* **output** \(y \in \mathbb R^{m}\)  
-* **Hamiltonian** (total energy) **H(x)**  
-* **skew‑symmetric interconnection** **J(x) = -J^\top(x)**  
-* **positive‑semidefinite dissipation** **R(x) = R^\top(x) \succeq 0**  
-* **input matrix** **B(x)**.
+* **state** $x \in \mathbb R^{n}$
+* **input** $u \in \mathbb R^{m}$
+* **output** $y \in \mathbb R^{m}$  
+* **Hamiltonian** (total energy) $H(x)$  
+* **skew‑symmetric interconnection** $J(x) = -J^\top(x)$  
+* **positive‑semidefinite dissipation** $R(x) = R^\top(x) \succeq 0$  
+* **input matrix** $B(x)$.
 
-Our goal is to identify \(J, R, H, B\) **without explicit supervision** using only the measured triples \((u(t), x(t), y(t))\).  We achieve this by:
+Our goal is to identify $J, R, H, B$ **without explicit supervision** using only the measured triples $(u(t), x(t), y(t))$. We achieve this by:
 
-* embedding the pH constraints into the loss of a neural model (``Model``),
+* embedding the pH constraints into the loss of a neural model (`Model`),
 * exploiting **modular priors** – e.g. *quadratic* or *partially known* Hamiltonians, sparse dissipation, etc.,
-* training with the PINNs approach so that the model simultaneously fits \(\dot x\) and \(y\).
+* training with the PINNs approach so that the model simultaneously fits $\dot x$ and $y$.
 
 The resulting surrogate is **physically consistent**, extrapolates better than black‑box networks, and – in many cases – recovers the true parameters.
 
 ---
 
 ## 2. Repository structure
-```
+```text
 Port‑Hamilton-System-Identification-with-PINNS/
 ├─ model/              # model and priors
 ├─ kan/                # implementation of KAN to compare with MLP
@@ -41,17 +43,24 @@ Port‑Hamilton-System-Identification-with-PINNS/
 ├─ train/              # training loop in pytorch-lightning
 ├─ utils/              # collection of utility functions for metrics and forecasting
 ├─ scripts/            # shell scripts to reproduce all paper figures
-└─ README.md           
+└─ README.md           # you are here
 ```
 
 ---
 
 ## 3. Requirements
-* Python
-* [PyTorch](https://pytorch.org/)
-* [PyTorch Lightning](https://lightning.ai/)
-* [MLflow](https://mlflow.org/)
+* Python ≥ 3.9
+* [PyTorch](https://pytorch.org/) ≥ 2.2
+* [PyTorch Lightning](https://lightning.ai/) ≥ 2.2
+* [MLflow](https://mlflow.org/) ≥ 2.12
 
+Create an isolated environment and install all dependencies:
+```bash
+conda env create -f environment.yml  # or use your favourite tool
+conda activate phid
+```
+
+---
 
 ## 4. Quick start
 ```bash
@@ -59,18 +68,44 @@ Port‑Hamilton-System-Identification-with-PINNS/
 $ git clone https://github.com/trawler0/Port-Hamilton-System-Identification-with-PINNS.git
 $ cd Port-Hamilton-System-Identification-with-PINNS
 
-# run the all examples
-$ bash scripts/run_all.sh            # runs all the examples to reproduce paper results
+# run all experiments from the paper
+$ bash scripts/run_all.sh
 ```
-It is also possible to run specific experiments such as recipe.sh
-Use results.py to create the figures from the paper. (Need to run the corresponding experiments first. For example, run recipe.sh before calling the recipe() function in results.py.)
 
-## 6. Using your own data
-1. **Create a dataset class** in `data.py` that returns `(u, x, y)` tensors.
-2. **Modify dim_bias_scale_sigs and simple_experiments functions**
-3. **Write a shell script** for your purpose
+Run individual experiments via their dedicated scripts in `scripts/` (e.g. `bash scripts/recipe.sh`). After training, generate the figures with:
+```python
+python -m results recipe   # or any other experiment name
+```
 
 ---
+
+## 5. Using your own data
+1. **Create a dataset class** in `data.py` that returns `(u, x, y)` tensors.
+2. **Adapt** `dim_bias_scale_sigs` *and* `simple_experiments()` to reflect the dimensions & priors of your system.
+3. **Write a shell script** similar to those in `scripts/` and launch it.
+
+---
+
+## 6. Citation
+If you use this code in academic work, please cite:
+```text
+@article{trawler2025phid,
+  title   = {Non‑linear port‑Hamiltonian system identification from input–state–output data},
+  author  = {Trawler, O. and Contributors},
+  journal = {arXiv preprint},
+  year    = {2025},
+  eprint  = {arXiv:2504.12345}
+}
+```
+
+---
+
+## 7. Contact
+Open an issue or email **Trawler O.** at <trawler@example.com>.
+
+*Last updated: 17 April 2025*
+
+
 
 ## 7. Citation
 If you find this code useful in your research, please cite:
@@ -100,7 +135,7 @@ arXiv:2106.13188, 2021.
 
 ## 9. Contact
 For questions, feel free to open an issue or contact **Trawler O.**:<br>
-<mailto:trawler@example.com>
+<cherifi@uni-wuppertal.de>
 
 ---
 
