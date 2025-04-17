@@ -100,12 +100,6 @@ If you use this code in academic work, please cite:
 
 ---
 
-## 7. Contact
-Open an issue or email **Trawler O.** at <trawler@example.com>.
-
-*Last updated: 17 April 2025*
-
-
 
 ## 7. Citation
 If you find this code useful in your research, please cite:
