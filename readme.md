@@ -77,9 +77,14 @@ $ bash scripts/run_all.sh
 ```
 
 Run individual experiments via their dedicated scripts in `scripts/` (e.g. `bash scripts/recipe.sh`). After training, generate the figures with:
-```python
-python -m results recipe   # or any other experiment name
 ```
+python results.py
+```
+You can also run 
+```
+mlflow ui
+```
+to inspect training runs live
 
 ---
 
