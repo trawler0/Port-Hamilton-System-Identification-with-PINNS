@@ -76,23 +76,3 @@ class TrainingModule(LightningModule):
                 'frequency': 1
             }
         }
-
-if __name__ == "__main__":
-    from model import SimpleMLPSystemIdentifier
-    layer = SimpleMLPSystemIdentifier(4, 64)
-    model = TrainingModule(layer)
-
-    x = torch.rand(10, 4)
-    y = torch.rand(10, 4)
-
-    model.training_step((x, y), 0)
-
-    trajectories = torch.rand(10, 120, 4)
-    model.validation_step(trajectories, 0)
-
-
-#scaling_spring_chain_spring
-#scaling_spring_chain_spring
-#scaling_spring_chain_spring
-#scaling_spring_chain_spring
-#scaling_default_spring
