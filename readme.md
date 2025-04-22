@@ -95,22 +95,8 @@ to inspect training runs live
 
 ---
 
+
 ## 6. Citation
-If you use this code in academic work, please cite:
-```text
-@article{trawler2025phid,
-  title   = {Non‑linear port‑Hamiltonian system identification from input–state–output data},
-  author  = {Trawler, O. and Contributors},
-  journal = {arXiv preprint},
-  year    = {2025},
-  eprint  = {arXiv:2504.12345}
-}
-```
-
----
-
-
-## 7. Citation
 If you find this code useful in your research, please cite:
 ```text
 @article{cherifi2025nonlinear,
@@ -123,7 +109,7 @@ If you find this code useful in your research, please cite:
 
 ---
 
-## 8. References
+## 7. References
 *  C. Neary, U. Topcu, Compositional learning of dynamical system mod-
 els using port- Hamiltonian neural networks, in: Proceedings of Machine
 Learning Research vol 211:1–17, 2023 5th Annual Conference on Learn-
