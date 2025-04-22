@@ -123,8 +123,8 @@ arXiv:2106.13188, 2021.
 ---
 
 ## 9. Contact
-For questions, feel free to open an issue or contact **Trawler O.**:<br>
-<cherifi@uni-wuppertal.de>
+For questions, feel free to open an issue or contact **Marco Roschkowski**:<br>
+<roschkowski@uni-wuppertal.de>
 
 ---
 
