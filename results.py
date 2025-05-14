@@ -520,8 +520,295 @@ def noise():
     plt.savefig(os.path.join("results", f"noise_{N}.png"))
 
 
+def data_scaling_law(name, method="default", metric="accurate_Time"):
+    experiment = mlflow.get_experiment_by_name(f"scaling_{method}_{name}")
+    runs = mlflow.search_runs(experiment.experiment_id)
 
-noise()
+    compute_ = []
+    traj_val = []
+    mae_rel_ = []
+    sizes = []
+    acc_ = []
+
+    for i, run in runs.iterrows():
+        try:
+            run_id = run["run_id"]
+            run_data = mlflow.get_run(run_id)
+            params = run_data.data.params
+            metrics = run_data.data.metrics
+
+            epochs = float(params["epochs"])
+            trajectories = float(params["num_trajectories"])
+            compute = epochs * trajectories
+            hidden_dim = float(params["hidden_dim"])
+            mae_rel = float(metrics["mae_rel"])
+
+            compute_.append(compute)
+            traj_val.append(trajectories)
+            mae_rel_.append(mae_rel)
+            sizes.append(hidden_dim)
+            artifacts_path = mlflow.artifacts.download_artifacts(run_id=run_id)
+            for root, _, files in os.walk(artifacts_path):
+                for file in files:
+                    artifact_file_path = os.path.join(root, file)
+                    if artifact_file_path.endswith("accurate_time.npy"):
+                        accurate_time = np.load(artifact_file_path)
+                        accurate_time = np.mean(accurate_time, axis=0)[
+                                            2] / 100  # np.exp(np.mean(np.log(accurate_time / 100), axis=0))[0]
+                        acc_.append(accurate_time)
+        except Exception as e:
+            # Optionally log the error for debugging:
+            # print(f"Error processing run {run_id}: {e}")
+            pass
+
+    # Convert lists to numpy arrays for convenience
+    compute_ = np.array(compute_)
+    traj_val = np.array(traj_val)
+    if metric == "normalized_MAE":
+        mae_rel_ = np.array(mae_rel_)
+    elif metric == "accurate_Time":
+        mae_rel_ = np.array(acc_)
+    sizes = 4 * np.array(sizes)
+
+    # Create scatter plot: x = trajectories, y = mae_rel, color by compute_
+    plt.figure(figsize=(8, 6))
+    scatter = plt.scatter(traj_val, mae_rel_, c=np.log10(compute_), cmap='coolwarm', edgecolor='k', s=sizes)
+
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.xlabel("Number of Trajectories (log scale)")
+    plt.ylabel(f"{metric} Relative (log scale)")
+    plt.title(f"Scaling Law: {metric} Relative vs. Number of Trajectories")
+
+    # Create a colorbar to show mapping of compute value to color.
+    cbar = plt.colorbar(scatter)
+    cbar.set_label("Compute (epochs * num_trajectories)")
+
+    plt.grid(True, which="both", ls="--", lw=0.5)
+    # plt.show()
+    plt.savefig(os.path.join("results", f"data_scaling_{method}_{name}_{metric}.png"))
+
+
+def compute_scaling_law(name, method="default", metric="accurate_Time"):
+    experiment = mlflow.get_experiment_by_name(f"scaling_{method}_{name}")
+    runs = mlflow.search_runs(experiment.experiment_id)
+
+    compute_ = []
+    traj_val = []
+    mae_rel_ = []
+    sizes = []
+    acc_ = []
+
+    for i, run in runs.iterrows():
+        try:
+            run_id = run["run_id"]
+            run_data = mlflow.get_run(run_id)
+            params = run_data.data.params
+            metrics = run_data.data.metrics
+
+            epochs = float(params["epochs"])
+            trajectories = float(params["num_trajectories"])
+            hidden_dim = float(params["hidden_dim"])
+            compute = epochs * trajectories
+
+            mae_rel = float(metrics["mae_rel"])
+
+            compute_.append(compute)
+            traj_val.append(trajectories)
+            mae_rel_.append(mae_rel)
+            sizes.append(hidden_dim)
+            artifacts_path = mlflow.artifacts.download_artifacts(run_id=run_id)
+            for root, _, files in os.walk(artifacts_path):
+                for file in files:
+                    artifact_file_path = os.path.join(root, file)
+                    if artifact_file_path.endswith("accurate_time.npy"):
+                        accurate_time = np.load(artifact_file_path)
+                        accurate_time = np.mean(accurate_time, axis=0)[
+                                            2] / 100  # np.exp(np.mean(np.log(accurate_time / 100), axis=0))[0]
+                        acc_.append(accurate_time)
+
+        except Exception as e:
+            # Optionally log the error for debugging:
+            # print(f"Error processing run {run_id}: {e}")
+            pass
+
+    # Convert lists to numpy arrays for convenience
+    compute_ = np.array(compute_)
+    traj_val = np.array(traj_val)
+    if metric == "normalized_MAE":
+        mae_rel_ = np.array(mae_rel_)
+    elif metric == "accurate_Time":
+        mae_rel_ = np.array(acc_)
+    sizes = 4 * np.array(sizes)
+
+    # Create scatter plot: x = compute, y = mae_rel, color by trajectories (more red = more trajectories)
+    plt.figure(figsize=(8, 6))
+    scatter = plt.scatter(compute_, mae_rel_, c=np.log10(traj_val), cmap='coolwarm', edgecolor='k', s=sizes)
+
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.xlabel("Compute (epochs * num_trajectories, log scale)")
+    plt.ylabel(f"{metric} (log scale)")
+    plt.title(f"Scaling Law: {metric} vs. Compute")
+
+    # Create a colorbar to show mapping of trajectories to color intensity.
+    cbar = plt.colorbar(scatter)
+    cbar.set_label("Number of Trajectories")
+
+    plt.grid(True, which="both", ls="--", lw=0.5)
+    # plt.show()
+    plt.savefig(os.path.join("results", f"compute_scaling_{method}_{name}_{metric}.png"))
+
+
+def dimension_scaling_law(name, method="default", metric="accurate_Time"):
+    experiment = mlflow.get_experiment_by_name(f"scaling_{method}_{name}")
+    runs = mlflow.search_runs(experiment.experiment_id)
+
+    compute_ = []
+    traj_val = []
+    mae_rel_ = []
+    sizes = []
+    acc_ = []
+
+    for i, run in runs.iterrows():
+        try:
+            run_id = run["run_id"]
+            run_data = mlflow.get_run(run_id)
+            params = run_data.data.params
+            metrics = run_data.data.metrics
+
+
+            epochs = float(params["epochs"])
+            trajectories = float(params["num_trajectories"])
+            hidden_dim = float(params["hidden_dim"])
+            compute = epochs * trajectories
+
+            mae_rel = float(metrics["mae_rel"])
+
+            compute_.append(compute)
+            traj_val.append(trajectories)
+            mae_rel_.append(mae_rel)
+            sizes.append(hidden_dim)
+            artifacts_path = mlflow.artifacts.download_artifacts(run_id=run_id)
+            for root, _, files in os.walk(artifacts_path):
+                for file in files:
+                    artifact_file_path = os.path.join(root, file)
+                    if artifact_file_path.endswith("accurate_time.npy"):
+                        accurate_time = np.load(artifact_file_path)
+                        accurate_time = np.mean(accurate_time, axis=0)[
+                                            2] / 100  # np.exp(np.mean(np.log(accurate_time / 100), axis=0))[0]
+                        acc_.append(accurate_time)
+        except Exception as e:
+            # Optionally log the error for debugging:
+            # print(f"Error processing run {run_id}: {e}")
+            pass
+
+    # Convert lists to numpy arrays for convenience
+    compute_ = np.array(compute_)
+    traj_val = np.array(traj_val)
+    if metric == "normalized_MAE":
+        mae_rel_ = np.array(mae_rel_)
+    elif metric == "accurate_Time":
+        mae_rel_ = np.array(acc_)
+    sizes = 4 * np.array(sizes)
+
+    # Create scatter plot: x = compute, y = mae_rel, color by trajectories (more red = more trajectories)
+    plt.figure(figsize=(8, 6))
+    scatter = plt.scatter(sizes, mae_rel_, c=np.log10(traj_val), cmap='coolwarm', edgecolor='k',
+                          s=10 * np.log(compute_))
+
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.xlabel("Hidden Dim, log scale)")
+    plt.ylabel(f"{metric} Relative (log scale)")
+    plt.title(f"Scaling Law: {metric} vs. Compute")
+
+    # Create a colorbar to show mapping of trajectories to color intensity.
+    cbar = plt.colorbar(scatter)
+    cbar.set_label("Number of Trajectories")
+
+    plt.grid(True, which="both", ls="--", lw=0.5)
+    # plt.show()
+    plt.savefig(os.path.join("results", f"dimension_scaling_{method}_{name}_{metric}.png"))
+
+def export_runs():
+    mn = [
+        ("spring_multi_mass", "spring_chain"),
+        ("spring_multi_mass", "default"),
+        ("spring_multi_mass", "baseline"),
+        ("ball", "affine"),
+        ("ball", "default"),
+        ("motor", "baseline"),
+        ("motor", "affine"),
+        ("spring", "default"),
+        ("spring", "affine"),
+        ("spring", "baseline")
+    ]
+    out = {}
+    for name, method in mn:
+        print("Creating plots for", name, method)
+        experiment = mlflow.get_experiment_by_name(f"scaling_{method}_{name}")
+        runs = mlflow.search_runs(experiment.experiment_id)
+
+        compute_ = []
+        traj_val = []
+        mae_rel_ = []
+        mse_rel_ = []
+        sizes = []
+        acc_ = []
+
+        try:
+            for i, run in runs.iterrows():
+                try:
+                    run_id = run["run_id"]
+                    run_data = mlflow.get_run(run_id)
+                    params = run_data.data.params
+                    metrics = run_data.data.metrics
+
+                    epochs = float(params["epochs"])
+                    trajectories = float(params["num_trajectories"])
+                    compute = epochs * trajectories
+                    hidden_dim = float(params["hidden_dim"])
+                    mae_rel = float(metrics["mae_rel"])
+                    mse_rel = float(metrics["mse_rel"])
+
+                    compute_.append(compute)
+                    traj_val.append(trajectories)
+                    mae_rel_.append(mae_rel)
+                    mse_rel_.append(mse_rel)
+                    sizes.append(hidden_dim)
+                    artifacts_path = mlflow.artifacts.download_artifacts(run_id=run_id)
+                    for root, _, files in os.walk(artifacts_path):
+                        for file in files:
+                            artifact_file_path = os.path.join(root, file)
+                            if artifact_file_path.endswith("accurate_time.npy"):
+                                accurate_time = np.load(artifact_file_path)
+                                accurate_time = np.mean(accurate_time, axis=0) / 100  # np.exp(np.mean(np.log(accurate_time / 100), axis=0))[0]
+                                acc_.append(accurate_time)
+                except Exception as e:
+                    # Optionally log the error for debugging:
+                    # print(f"Error processing run {run_id}: {e}")
+                    pass
+            compute_ = np.array(compute_)
+            traj_val = np.stack(traj_val)
+            mae_rel_ = np.array(mae_rel_)
+            mse_rel_ = np.array(mse_rel_)
+            sizes = np.array(sizes)
+            acc_ = np.stack(acc_)
+
+            out[f"mae_{method}_{name}"] = mae_rel_
+            out[f"mse_{method}_{name}"] = mse_rel_
+            out[f"acc_{method}_{name}"] = acc_
+            out[f"compute_{method}_{name}"] = compute_
+            out[f"traj_{method}_{name}"] = traj_val
+            out[f"sizes_{method}_{name}"] = sizes
+        except Exception as e:
+            print(f"Error processing {method}_{name}: {e}")
+
+    np.save("results.npy", out)
+
+
+"""noise()
 plot_scaling("ball")
 plot_scaling("motor")
 plot_scaling("spring")
@@ -529,4 +816,56 @@ recipe()
 compare()
 prior_vs_default()
 prior_comparison()
-prior_vs_default_motor()
+prior_vs_default_motor()"""
+"""compute_scaling_law("ball")
+data_scaling_law("ball")
+dimension_scaling_law("ball")
+compute_scaling_law("ball", "baseline")
+data_scaling_law("ball", "baseline")
+dimension_scaling_law("ball", "baseline")"""
+
+"""name = "spring_multi_mass"
+for metric in ["normalized_MAE", "accurate_Time"]:
+    for method in ["spring_chain", "default", "baseline"]:
+        print("Creating plots for", name, method, metric)
+        print("Compute scaling law")
+        compute_scaling_law(name, method, metric)
+        print("Data scaling law")
+        data_scaling_law(name, method, metric)
+        print("Dimension scaling law")
+        dimension_scaling_law(name, method, metric)
+
+name = "ball"
+for metric in ["normalized_MAE", "accurate_Time"]:
+    for method in ["affine", "default"]:
+        print("Creating plots for", name, method, metric)
+        print("Compute scaling law")
+        compute_scaling_law(name, method, metric)
+        print("Data scaling law")
+        data_scaling_law(name, method, metric)
+        print("Dimension scaling law")
+        dimension_scaling_law(name, method, metric)
+
+name = "motor"
+for metric in ["normalized_MAE", "accurate_Time"]:
+    for method in ["baseline", "affine"]:
+        print("Creating plots for", name, method, metric)
+        print("Compute scaling law")
+        compute_scaling_law(name, method, metric)
+        print("Data scaling law")
+        data_scaling_law(name, method, metric)
+        print("Dimension scaling law")
+        dimension_scaling_law(name, method, metric)
+
+name = "spring"
+for metric in ["normalized_MAE", "accurate_Time"]:
+    for method in ["default", "affine", "baseline"]:
+        print("Creating plots for", name, method, metric)
+        print("Compute scaling law")
+        compute_scaling_law(name, method, metric)
+        print("Data scaling law")
+        data_scaling_law(name, method, metric)
+        print("Dimension scaling law")
+        dimension_scaling_law(name, method, metric)"""
+
+export_runs()
