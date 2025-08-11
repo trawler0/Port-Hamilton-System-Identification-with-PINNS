@@ -2,8 +2,7 @@ import numpy as np
 from scipy.optimize import curve_fit
 from matplotlib import pyplot as plt
 import matplotlib as mpl
-import os
-import string  # for subplot labels (A, B, C, D, ...)
+import string
 from matplotlib.cm import ScalarMappable
 from matplotlib.colors import LogNorm
 plt.rcParams.update({'font.size': 18})  # or any size you want
@@ -77,7 +76,7 @@ for i, (method, name) in enumerate(mn):
             M = np.log10(M)
 
             def scaling_law_log(C, a, b, c, d):
-                return np.log10(b * (10**C + c)**d)
+                return np.log10(a + b * (10**C + c)**d)
 
             p0 = [np.mean(10**M), 1.0, 1.0, -1.0]
             bounds = ([1e-10, 1e-10, 0, -6], [np.inf, np.inf, np.inf, -0.3])  # <- was -0.1
@@ -261,7 +260,7 @@ def low_data_prior(data, mn, N=10):
     # plt.show()
 
 
-def mae_examples_nicer(data, mn, C, M, params, metric="mae"):
+def mae_examples_nicer(data, mn, C, M, params, metric="mse"):
     all_trajectories = np.concatenate([
         data[f"traj_{mn[i][1]}_{mn[i][0]}"] for i in range(4)
     ])
@@ -327,6 +326,72 @@ def mae_examples_nicer(data, mn, C, M, params, metric="mae"):
     cbar.set_ticklabels([rf"$10^{{{int(np.log10(t))}}}$" for t in ticks])
 
     plt.savefig(f"figures/{metric}_examples.jpg", bbox_inches='tight')
+
+
+def mae_examples_single(data, mn, C, M, params, metric="mse"):
+    trajectory = data[f"traj_{mn[1]}_{mn[0]}"]
+
+    vmin, vmax = trajectory.min(), trajectory.max()
+
+    fig, axes = plt.subplots(figsize=(15, 15))
+    fig.subplots_adjust(right=0.85, wspace=0.25, hspace=0.3)
+
+    labels = list(string.ascii_uppercase)
+
+    scatter_kwargs = dict(
+        cmap='coolwarm',
+        edgecolor='k',
+        alpha=0.7,
+        norm=LogNorm(vmin=vmin, vmax=vmax)
+    )
+
+    def sf(x):
+        return f"{x:.2g}"
+
+    def add_annotation(ax, title_str, formula_str):
+        text_str = rf"{title_str}"
+        ax.text(0.03, 0.1, text_str, transform=ax.transAxes,
+                ha='left', va='bottom')
+        #ax.text(0.03, 0.05, f"${formula_str}$", transform=ax.transAxes,
+        #        ha='left', va='bottom', fontsize=9)
+
+    compute = data[f"compute_{mn[1]}_{mn[0]}"]
+    mae = data[f"{metric}_{mn[1]}_{mn[0]}"]
+    trajectories = data[f"traj_{mn[1]}_{mn[0]}"]
+    sizes = data[f"sizes_{mn[1]}_{mn[0]}"]
+
+    criterion = compute < 1e5
+    idx = np.where(criterion)[0]
+    sc = axes.scatter(
+        compute[idx], mae[idx],
+        c=trajectories[idx],
+        s=(sizes[idx] ** 2) / 16,
+        **scatter_kwargs
+    )
+    criterion = C < 1e5
+    idx = np.where(criterion)[0]
+    axes.plot(C[idx], M[idx])
+    axes.set_xlabel(r"Compute in $epochs \cdot trajectories$")
+    axes.set_ylabel(r"nMSE" if metric == "mse" else "nMAE")
+    a, b, c_, d = params
+    formula = rf"f(C) = {sf(a)} + {sf(b)}(C + {sf(c_)})^{{{sf(d)}}}"
+    add_annotation(axes, f"{MM[mn[1]]} - {DD[mn[0]]}", formula)
+
+    axes.set_xscale('log')
+    axes.set_yscale('log')
+    axes.grid(True, which='both', linestyle='--', alpha=0.2)
+
+    cbar_ax = fig.add_axes([0.88, 0.2, 0.02, 0.6])
+    sm = mpl.cm.ScalarMappable(cmap='coolwarm', norm=LogNorm(vmin=vmin, vmax=vmax))
+    sm.set_array([])
+    cbar = plt.colorbar(sm, cax=cbar_ax)
+    cbar.set_label(r"Trajectory Count", labelpad=10)
+    ticks = np.geomspace(vmin, vmax, num=5)
+    cbar.set_ticks(ticks)
+    cbar.set_ticklabels([rf"$10^{{{int(np.log10(t))}}}$" for t in ticks])
+
+    plt.savefig(f"figures/{metric}_examples_single.jpg", bbox_inches='tight')
+
 
 def acc_examples_nicer(data, mn, C, M, params, idxs):
     all_trajectories = np.concatenate([
@@ -415,10 +480,12 @@ def acc_examples_nicer(data, mn, C, M, params, idxs):
 
 #low_data_prior(data, mn[-3:])
 #low_data_prior(data, mn[:3], N=100)
-mae_examples_nicer(data, [mn[2], mn[6], mn[4], mn[7]], [C_fits[2], C_fits[6], C_fits[4], C_fits[7]],
-            [M_fits[2], M_fits[6], M_fits[4], M_fits[7]], [params_maes[2], params_maes[6], params_maes[4], params_maes[7]])
-mae_examples_nicer(data, [mn[2], mn[5], mn[9], mn[2]], [C_fits_mse[2], C_fits_mse[5], C_fits_mse[9], C_fits_mse[2]],
-            [MS_fits[2], MS_fits[5], MS_fits[9], MS_fits[2]], [params_maes[2], params_maes[5], params_maes[9], params_maes[2]], metric="mse")
+mae_examples_single(data, mn[4], C_fits_mse[4], MS_fits[4], params_maes[4])
+
+mae_examples_nicer(data, [mn[0], mn[1], mn[2], mn[3]], [C_fits[0], C_fits[1], C_fits[2], C_fits[3]],
+            [M_fits[0], M_fits[1], M_fits[2], M_fits[3]], [params_maes[0], params_maes[1], params_maes[2], params_maes[3]], metric="mae")
+mae_examples_nicer(data, [mn[4], mn[5], mn[6], mn[7]], [C_fits_mse[4], C_fits_mse[5], C_fits_mse[6], C_fits_mse[7]],
+            [MS_fits[4], MS_fits[5], MS_fits[6], MS_fits[7]], [params_mses[4], params_mses[5], params_mses[6], params_mses[7]], metric="mse")
 
 acc_examples_nicer(data, [mn[5], mn[8], mn[3], mn[6]], [C_fits_acc[5], C_fits_acc[8], C_fits_acc[3], C_fits_acc[6]],
             [A_fits[5], A_fits[8], A_fits[3], A_fits[6]], [params_accs[5], params_accs[8], params_accs[3], params_accs[6]],
@@ -489,4 +556,4 @@ fig.suptitle("Scaling of Error and Accuracy with Data and Compute", fontsize=16,
 
 # Save to file
 plt.savefig("figures/data_scaling.jpg", bbox_inches='tight')
-# plt.show()
+# plt.show()"""
