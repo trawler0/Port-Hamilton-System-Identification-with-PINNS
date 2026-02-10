@@ -1,0 +1,23 @@
+artifact_path: /home/marco/vs-code-projects/ph-revision/Port-Hamilton-System-Identification-with-PINNS/mlruns/12/models/m-ac3f3ec92a264b51b889accd783dd648/artifacts
+flavors:
+  python_function:
+    config:
+      device: null
+    data: data
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.pytorch
+    pickle_module_name: mlflow.pytorch.pickle_module
+    python_version: 3.10.18
+  pytorch:
+    code: null
+    model_data: data
+    pytorch_version: 2.7.1+cu118
+mlflow_version: 3.9.0
+model_id: m-ac3f3ec92a264b51b889accd783dd648
+model_size_bytes: 51693
+model_uuid: m-ac3f3ec92a264b51b889accd783dd648
+prompts: null
+run_id: a8646babe50c44248db87a8d6dd20a36
+utc_time_created: '2026-02-10 19:07:08.590392'

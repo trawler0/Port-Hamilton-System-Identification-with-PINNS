@@ -1,0 +1,12 @@
+# MLflow tracking DB (if created in repo root)
+mlflow.db
+
+# MLflow artifacts / tracking directory
+mlflow/
+
+# Experiment outputs
+results/
+
+# Python bytecode caches
+__pycache__/
+**/__pycache__/
