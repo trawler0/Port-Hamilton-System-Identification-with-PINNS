@@ -10,3 +10,6 @@ results/
 # Python bytecode caches
 __pycache__/
 **/__pycache__/mlflow.db
+
+scaling_figs.py
+scaling.ipynb
