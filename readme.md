@@ -55,14 +55,7 @@ Port‑Hamilton-System-Identification-with-PINNS/
 ## 3. Requirements
 * Python ≥ 3.9
 * [PyTorch](https://pytorch.org/) ≥ 2.2
-* [PyTorch Lightning](https://lightning.ai/) ≥ 2.2
 * [MLflow](https://mlflow.org/) ≥ 2.12
-
-Create an isolated environment and install all dependencies:
-```bash
-conda env create -f environment.yml  # or use your favourite tool
-conda activate phid
-```
 
 ---
 
