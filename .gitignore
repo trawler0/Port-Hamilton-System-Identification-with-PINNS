@@ -2,7 +2,7 @@
 mlflow.db
 
 # MLflow artifacts / tracking directory
-mlflow/
+mlruns/
 
 # Experiment outputs
 results/
