@@ -196,6 +196,47 @@ def normalized_mae(x, target):
     std = target.std()
     return ((x - target) / (std + 1e-6)).abs().mean()
 
+
+def _ensure_model_artifacts(model):
+    """
+    Ensure MLflow stores both:
+    1) a PyTorch model at artifact path `model` (for mlflow.pytorch.load_model),
+    2) a root-level `model.pth` file artifact.
+    """
+    active_run = mlflow.active_run()
+    if active_run is None:
+        return
+
+    run_id = active_run.info.run_id
+    client = mlflow.tracking.MlflowClient()
+
+    # Ensure `runs:/<run_id>/model` exists for mlflow.pytorch.load_model.
+    has_model_dir = False
+    try:
+        has_model_dir = len(client.list_artifacts(run_id, "model")) > 0
+    except Exception:
+        has_model_dir = False
+    if not has_model_dir:
+        mlflow.pytorch.log_model(model, "model")
+
+    # Ensure a top-level `model.pth` artifact also exists.
+    has_model_pth = False
+    try:
+        has_model_pth = any(a.path == "model.pth" for a in client.list_artifacts(run_id))
+    except Exception:
+        has_model_pth = False
+    if not has_model_pth:
+        model_pth_path = mlflow.artifacts.download_artifacts(
+            run_id=run_id,
+            artifact_path="model/data/model.pth",
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dst = os.path.join(tmpdir, "model.pth")
+            with open(model_pth_path, "rb") as src_f, open(dst, "wb") as dst_f:
+                dst_f.write(src_f.read())
+            mlflow.log_artifact(dst)
+
+
 @torch.no_grad()
 def compute_metrics(model, trajectories, dt, X, u, xdot, y, bounds=np.reshape(np.array([.001, .005, .01, .025, .05]), (1, 1, 5)), integrator="RK45"):
     """
@@ -243,6 +284,7 @@ def compute_metrics(model, trajectories, dt, X, u, xdot, y, bounds=np.reshape(np
             out_dict[k] = np.mean(v)
         return out_dict
     else:
+        _ensure_model_artifacts(model)
         N = len(X)
         x_dot_pred = []
         y_pred = []

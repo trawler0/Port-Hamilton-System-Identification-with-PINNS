@@ -9,7 +9,7 @@ from data import dim_bias_scale_sigs
 import mlflow
 import argparse
 import random
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--name", type=str, default="spring", help="Problem name: spring, ball, motor.")
@@ -43,14 +43,14 @@ parser.add_argument("--example", type=str, default=None, help="Optional example 
 parser.add_argument("--tag", type=str, default=None, help="Optional MLflow tag value.")
 parser.add_argument("--dB", type=float, default=None, help="SNR in dB for adding uniform noise; disabled if None.")
 parser.add_argument("--baseline", action="store_true", default=False, help="Use baseline MLP model.")
-parser.add_argument("--experiment", type=str, default="0", help="MLflow experiment name or id.")
+parser.add_argument("--experiment", type=str, default="1", help="MLflow experiment name or id.")
 parser.add_argument("--rescale_epochs", type=int, default=1, help="Epoch interval for rescaling (if used).")
 parser.add_argument("--no-forecast", action="store_true", default=False, help="Disable forecasting and visualization.")
-parser.add_argument("--no-normalize-u", action="store_true", default=False, help="Disable standardization of u.")
+parser.add_argument("--normalize-u", action="store_true", default=False, help="Enable standardization of u.")
 parser.add_argument("--no-normalize-x", action="store_true", default=False, help="Disable standardization of x.")
 parser.add_argument("--normalize-y", action="store_true", default=False, help="Enable standardization of y.")
 parser.add_argument("--normalize-xdot", action="store_true", default=False, help="Enable standardization of xdot.")
-parser.add_argument("--integrator", default="RK45", type=str, help="Forecast integrator: RK4 or IMPLICIT_MIDPOINT.")
+parser.add_argument("--integrator", default="RK45", type=str, help="Forecast integrator: RK45, RK4 or IMPLICIT_MIDPOINT.")
 parser.add_argument("--device", type=str, default="cpu", help="Device used for training.")
 parser.add_argument("--validation-frequency", type=int, default=None, help="How often to validate the model.")
 
@@ -96,14 +96,14 @@ X0_val = sample_initial_states(args.num_val_trajectories, DIM,
 X, u, xdot, y, _ = generator.get_data(X0_train)
 X_val, u_val, xdot_val, y_val, trajectories_val = generator_val.get_data(X0_val)
 
-scaler_X = StandardScaler()
+scaler_X = MinMaxScaler(feature_range=(-1, 1))
 scaler_u = StandardScaler()
 scaler_xdot = StandardScaler()
 scaler_y = StandardScaler()
 
 if not args.no_normalize_x:
     X = scaler_X.fit_transform(X)
-if not args.no_normalize_u:
+if args.normalize_u:
     u = scaler_u.fit_transform(u)
 if args.normalize_xdot:
     xdot = scaler_xdot.fit_transform(xdot)
@@ -155,7 +155,7 @@ class Predictor(nn.Module):
         if not args.no_normalize_x:
             x = x.detach().numpy()
             x = self.scaler_X.transform(x)
-        if not args.no_normalize_u:
+        if args.normalize_u:
             u = u.detach().numpy()
             u = self.scaler_u.transform(u)
         x = torch.tensor(x).float()
@@ -203,7 +203,7 @@ xdot_val_scaled = xdot_val.reshape(-1, xdot_val.shape[-1])
 
 if not args.no_normalize_x:
     X_val_scaled = scaler_X.transform(X_val_scaled)
-if not args.no_normalize_u:
+if args.normalize_u:
     u_val_scaled = scaler_u.transform(u_val_scaled)
 if args.normalize_y:
     y_val_scaled = scaler_y.transform(y_val_scaled)
@@ -221,6 +221,7 @@ if args.baseline:
 else:
     model = PHNNModel(DIM, args.hidden_dim, args.depth, J=args.J, R=args.R, grad_H=args.grad_H, G=args.G,
                         excitation=args.excitation, u_dim=sigs)
+print("Parameters:", sum(p.numel() for p in model.parameters()))
 train(model, train_loader, val_loader, args.epochs, args.output_weight, loss_fn=args.criterion, device=args.device, weight_decay=args.weight_decay, validation_frequency=args.validation_frequency)
 model = Predictor(model, scaler_X, scaler_u, scaler_xdot, scaler_y) # for eval
 
