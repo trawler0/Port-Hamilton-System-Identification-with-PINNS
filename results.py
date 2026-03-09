@@ -18,6 +18,7 @@ colors = {
     "baseline": "blue",
     "default": "red",
     "prior": "green",
+    "kan": "purple",
     "shallow": "gray",
     "shorter": "purple",
     "wrong": "turquoise",
@@ -26,6 +27,7 @@ colors = {
     "no_noise": "red",
     "noise25": "blue",
     "noise30": "green",
+    "noise35": "purple",
 }
 line_styles = {
     "True": "solid",
@@ -34,6 +36,8 @@ line_styles = {
     "prior": "--",
     "shallow": "--",
     "shorter": "--",
+    "kan": "--",
+    "noise35": "dotted",
     "noise30": "solid",
     "noise25": "dotted",
     "noise20": "dashed",
@@ -48,19 +52,22 @@ thickness = {
     "prior": 1.5,
     "shallow": 3,
     "shorter": 3,
+    "noise35": 2,
     "noise30": 1.5,
     "noise25": 1.5,
     "noise20": 1.5,
     "no_noise": 1.5,
+    "kan": 1.5
 }
 
 
-def plot_scaling(name):
-    experiment = mlflow.get_experiment_by_name(f"scaling_{name}")
+def plot_scaling(name, i):
+    experiment = mlflow.get_experiment_by_name(f"scaling_{name}_{i}")
     runs = mlflow.search_runs(experiment.experiment_id)
     baseline = {}
     default = {}
     prior = {}
+    kan = {}
     for i, run in runs.iterrows():
         run_id = run["run_id"]
         run = mlflow.get_run(run_id)
@@ -75,11 +82,14 @@ def plot_scaling(name):
             default[int(params["num_trajectories"])] = [mae_rel, mse_rel]
         elif run_name.startswith(f"{name}_prior"):
             prior[int(params["num_trajectories"])] = [mae_rel, mse_rel]
+        elif run_name.startswith(f"{name}_kan"):
+            kan[int(params["num_trajectories"])] = [mae_rel, mse_rel]
     assert default.keys() == baseline.keys() == prior.keys()
     sorted_keys = sorted(default.keys())
     mae_rel_baseline = [baseline[k][0] for k in sorted_keys]
     mae_rel_default = [default[k][0] for k in sorted_keys]
     mae_rel_prior = [prior[k][0] for k in sorted_keys]
+    mae_rel_kan = [kan[k][0] for k in sorted_keys]
 
     # Create the figure and axis with an optimized size
     fig, ax = plt.subplots(figsize=(12, 8))  # Adjusted from (30, 30) to (12, 8)
@@ -88,6 +98,7 @@ def plot_scaling(name):
     ax.plot(sorted_keys, mae_rel_baseline, label="Baseline", marker='o', linestyle=":", color=colors["baseline"])
     ax.plot(sorted_keys, mae_rel_default, label="pH", marker='s', linestyle=":", color=colors["default"])
     ax.plot(sorted_keys, mae_rel_prior, label="pH prior", marker='^', linestyle=":", color=colors["prior"])
+    ax.plot(sorted_keys, mae_rel_kan, label="pH KAN", marker='4', linestyle=":", color=colors["kan"])
 
     # Set log scales
     ax.set_xscale("log")
@@ -114,8 +125,8 @@ def plot_scaling(name):
     plt.savefig(os.path.join("results", f"{name}_scaling.png"))
 
 
-def recipe():
-    experiment = mlflow.get_experiment_by_name("recipe")
+def recipe(i):
+    experiment = mlflow.get_experiment_by_name(f"recipe_{i}")
     runs = mlflow.search_runs(experiment.experiment_id)
     preds = {}
     for i, run in runs.iterrows():
@@ -123,6 +134,8 @@ def recipe():
         run = mlflow.get_run(run_id)
         params = run.data.params
         run_name = params["run_name"]
+        if run_name == "kan":
+            continue
         artifacts_path = mlflow.artifacts.download_artifacts(run_id=run_id)
 
         # Example: If artifact is a file, handle it
@@ -134,11 +147,11 @@ def recipe():
                     X_true = np.load(artifact_file_path.replace("X_pred", "X"))
                     preds[run_name] = X_pred
     n = X_pred.shape[-1]
-    idx = 16
-    state = 3
+    idx = 9
+    state = 1
     fig, ax = plt.subplots(1, 1, figsize=(30, 15))
-    time = np.arange(len(X_true[idx, :10000, state])) * 0.01
-    ax.plot(time, X_true[idx, :10000, state], label="True", color=colors["True"], linestyle=line_styles["True"],
+    time = np.arange(len(X_true[idx, :1500, state])) * 0.01
+    ax.plot(time, X_true[idx, :1500, state], label="True", color=colors["True"], linestyle=line_styles["True"],
             linewidth=thickness["True"])
     for run_name, X_pred in preds.items():
         def rename(name):
@@ -148,8 +161,10 @@ def recipe():
                 return "pH shorter"
             elif name == "default":
                 return "pH default"
+            elif name == "kan":
+                return "kan"
 
-        ax.plot(time, X_pred[idx, :10000, state], label=rename(run_name), color=colors[run_name],
+        ax.plot(time, X_pred[idx, :1500, state], label=rename(run_name), color=colors[run_name],
                 linestyle=line_styles[run_name], linewidth=thickness[run_name])
     ax.axvline(x=10., color='purple', linestyle='--', linewidth=2)
     ax.grid()
@@ -168,8 +183,8 @@ def recipe():
     plt.savefig(os.path.join("results", "recipe.png"))
 
 
-def compare():
-    experiment = mlflow.get_experiment_by_name("compare")
+def compare(i):
+    experiment = mlflow.get_experiment_by_name(f"compare_{i}")
     runs = mlflow.search_runs(experiment.experiment_id)
     preds = {}
     for i, run in runs.iterrows():
@@ -188,14 +203,14 @@ def compare():
                     X_true = np.load(artifact_file_path.replace("X_pred", "X"))
                     preds[run_name] = X_pred
 
-    idx = 12
+    idx = 10
     state = 1
     n = X_pred.shape[-1]
     fig, ax = plt.subplots(1, 1, figsize=(30, 15))
     ax.set_xlabel("Time [s]", fontsize=32)
     ax.set_ylabel("Momentum $x_2$", fontsize=32)
-    t = np.arange(1500) * 0.01
-    ax.plot(t, X_true[idx, :1500, state], label="True", color=colors["True"], linestyle=line_styles["True"],
+    t = np.arange(2000) * 0.01
+    ax.plot(t, X_true[idx, :2000, state], label="True", color=colors["True"], linestyle=line_styles["True"],
             linewidth=thickness["True"])
     for run_name, X_pred in preds.items():
         def rename(name):
@@ -206,7 +221,7 @@ def compare():
             elif name == "baseline":
                 return "Baseline"
 
-        ax.plot(t, X_pred[idx, :1500, state], label=rename(run_name), color=colors[run_name],
+        ax.plot(t, X_pred[idx, :2000, state], label=rename(run_name), color=colors[run_name],
                 linestyle=line_styles[run_name], linewidth=thickness[run_name])
     ax.axvline(x=10., color='purple', linestyle='--', linewidth=2)
     ax.tick_params(axis='both', which='major', labelsize=32)
@@ -223,8 +238,8 @@ def compare():
     plt.savefig(os.path.join("results", "compare.png"))
 
 
-def prior_vs_default():
-    experiment = mlflow.get_experiment_by_name("prior_vs_default")
+def prior_vs_default(i):
+    experiment = mlflow.get_experiment_by_name(f"prior_vs_default_{i}")
     runs = mlflow.search_runs(experiment.experiment_id)
     models = {}
     for i, run in runs.iterrows():
@@ -296,8 +311,8 @@ def prior_vs_default():
     #plt.show()
 
 
-def prior_vs_default_motor():
-    experiment = mlflow.get_experiment_by_name("scaling_motor")
+def prior_vs_default_motor(i):
+    experiment = mlflow.get_experiment_by_name(f"scaling_motor_{i}")
     runs = mlflow.search_runs(experiment.experiment_id)
     models = {}
     for i, run in runs.iterrows():
@@ -373,8 +388,8 @@ def prior_vs_default_motor():
     #plt.show()
 
 
-def prior_comparison():
-    experiment = mlflow.get_experiment_by_name("prior_comparison")
+def prior_comparison(i):
+    experiment = mlflow.get_experiment_by_name(f"prior_comparison_{i}")
     all_runs = mlflow.search_runs(experiment.experiment_id)
     for name in ["spring"]:
         runs = all_runs[all_runs["tags.name"] == name]
@@ -445,8 +460,8 @@ def prior_comparison():
         plt.savefig(os.path.join("results", f"{name}_prior_comparison.png"))
 
 
-def noise():
-    experiment = mlflow.get_experiment_by_name("noise")
+def noise(i):
+    experiment = mlflow.get_experiment_by_name(f"noise_{i}")
     print(experiment)
     runs = mlflow.search_runs(experiment.experiment_id)
     preds = {}
@@ -465,18 +480,19 @@ def noise():
                     X_pred = np.load(artifact_file_path)
                     X_true = np.load(artifact_file_path.replace("X_pred", "X"))
                     preds[run_name] = X_pred
-    idx = 15
+    idx = 3
     state = 2
     n = X_pred.shape[-1]
     fig, ax = plt.subplots(1, 1, figsize=(30, 15))
     ax.set_xlabel("Time [s]", fontsize=32)
     ax.set_ylabel("Flux $x_3$", fontsize=32)
     ax.tick_params(axis='both', which='major', labelsize=32)
-    N = 4000
-    t = np.arange(N) * 0.01
-    ax.plot(t, X_true[idx, :N, state], label="True", color=colors["True"], linestyle=line_styles["True"],
+    n = 0
+    N = 300
+    t = (np.arange(N-n) + n) * 0.01
+    ax.plot(t, X_true[idx, n:N, state], label="True", color=colors["True"], linestyle=line_styles["True"],
             linewidth=thickness["True"])
-    for run_name in ["noise30", "no_noise"]:
+    for run_name in ["noise25", "noise30", "noise35", "no_noise"]:
         X_pred = preds[run_name]
         print(run_name)
 
@@ -487,10 +503,12 @@ def noise():
                 return "25 dB"
             elif name == "noise30":
                 return "30 dB"
+            elif name == "noise35":
+                return "35 dB"
             elif name == "no_noise":
                 return "No noise"
 
-        ax.plot(t, X_pred[idx, :N, state], label=rename(run_name), color=colors[run_name],
+        ax.plot(t, X_pred[idx, n:N, state], label=rename(run_name), color=colors[run_name],
                 linestyle=line_styles[run_name], linewidth=thickness[run_name])
     # Add shaded area and vertical line if N >= 1000
     if N >= 1000:
@@ -521,13 +539,14 @@ def noise():
 
 
 
+recipe(6)
 
-#noise()
-#plot_scaling("ball")
-#plot_scaling("motor")
-#plot_scaling("spring")
-#recipe()
-#compare()
-#prior_vs_default()
-#prior_comparison()
-prior_vs_default_motor()
+"""noise(6)
+compare(6)
+plot_scaling("motor", 6)
+plot_scaling("ball", 6)
+plot_scaling("spring", 6)
+prior_vs_default(6)
+prior_comparison(6)
+prior_vs_default_motor(6)
+"""
